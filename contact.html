@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact — Quantum Medical Supply</title>
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <main>
+    <section class="page-head">
+      <div class="container">
+        <h1>Talk to a specialist</h1>
+        <p>For facility accounts, bulk pricing, and clinical questions.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container contact-layout">
+        <form class="checkout-form" id="contact-form" novalidate>
+          <fieldset>
+            <legend>Your details</legend>
+            <div class="form-row">
+              <label>Name <input name="name" required /></label>
+              <label>Email <input type="email" name="email" required /></label>
+            </div>
+            <label>Facility / Organization <input name="org" /></label>
+            <label>How can we help? <textarea name="message" rows="5" required></textarea></label>
+            <button type="submit" class="btn btn-primary">Send message</button>
+          </fieldset>
+        </form>
+
+        <aside class="contact-info">
+          <h3>Customer support</h3>
+          <p><strong>1-800-QUANTUM</strong><br />Mon–Fri · 7am–7pm ET</p>
+          <h3>Facility accounts</h3>
+          <p><a href="mailto:accounts@quantummedicalsupply.com">accounts@quantummedicalsupply.com</a></p>
+          <h3>Headquarters</h3>
+          <p>200 Innovation Drive<br />Cambridge, MA 02142</p>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+  <div id="cart-drawer" class="drawer" aria-hidden="true"></div>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/cart.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    document.getElementById('contact-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      showToast('Message sent — we\'ll be in touch within 1 business day.');
+      e.target.reset();
+    });
+  </script>
+</body>
+</html>

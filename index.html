@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quantum Medical Supply — Professional Medical Equipment & Supplies</title>
+  <meta name="description" content="Quantum Medical Supply provides hospital-grade medical equipment, PPE, diagnostics, and clinical supplies to healthcare professionals nationwide." />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">Trusted by 12,000+ clinicians</span>
+          <h1>Medical supplies engineered for modern care.</h1>
+          <p class="lede">Hospital-grade equipment, diagnostics, and PPE — sourced from the manufacturers you trust, delivered next-day to your facility.</p>
+          <div class="hero-cta">
+            <a href="products.html" class="btn btn-primary">Shop products</a>
+            <a href="#categories" class="btn btn-ghost">Browse categories</a>
+          </div>
+          <ul class="hero-trust">
+            <li><strong>FDA</strong> registered suppliers</li>
+            <li><strong>HSA / FSA</strong> eligible</li>
+            <li><strong>Net-30</strong> for facilities</li>
+          </ul>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="hero-card hero-card-1">
+            <div class="hero-card-label">Digital Stethoscope</div>
+            <div class="hero-card-price">$284.00</div>
+          </div>
+          <div class="hero-card hero-card-2">
+            <div class="hero-card-label">Pulse Oximeter</div>
+            <div class="hero-card-price">$89.50</div>
+          </div>
+          <div class="hero-card hero-card-3">
+            <div class="hero-card-label">Nitrile Gloves · 1000ct</div>
+            <div class="hero-card-price">$62.00</div>
+          </div>
+          <div class="hero-orb"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="strip">
+      <div class="container strip-grid">
+        <div class="strip-item"><span class="strip-icon">▮</span><div><strong>Free shipping</strong><span>Orders over $150</span></div></div>
+        <div class="strip-item"><span class="strip-icon">◆</span><div><strong>Next-day delivery</strong><span>Most US ZIPs</span></div></div>
+        <div class="strip-item"><span class="strip-icon">●</span><div><strong>Verified inventory</strong><span>Live stock counts</span></div></div>
+        <div class="strip-item"><span class="strip-icon">◉</span><div><strong>Clinical support</strong><span>RN team on call</span></div></div>
+      </div>
+    </section>
+
+    <section id="categories" class="section">
+      <div class="container">
+        <div class="section-head">
+          <h2>Shop by category</h2>
+          <a href="products.html" class="link-arrow">View all products →</a>
+        </div>
+        <div class="category-grid" id="category-grid"></div>
+      </div>
+    </section>
+
+    <section class="section section-muted">
+      <div class="container">
+        <div class="section-head">
+          <h2>Featured products</h2>
+          <a href="products.html" class="link-arrow">Shop all →</a>
+        </div>
+        <div class="product-grid" id="featured-grid"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container cta-banner">
+        <div>
+          <h2>Outfitting a clinic or hospital?</h2>
+          <p>Open a facility account for net-30 terms, dedicated account managers, and volume pricing on bulk orders.</p>
+        </div>
+        <a href="contact.html" class="btn btn-primary">Talk to a specialist</a>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <div id="cart-drawer" class="drawer" aria-hidden="true"></div>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/cart.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      renderCategories('category-grid');
+      renderFeatured('featured-grid');
+    });
+  </script>
+</body>
+</html>
