@@ -41,6 +41,12 @@ export default function LeadsPage() {
   const [importMsg, setImportMsg] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // Bulk selection
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkAgent, setBulkAgent] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -48,8 +54,41 @@ export default function LeadsPage() {
     if (statusFilter) params.set("status", statusFilter);
     const res = await fetch(`/api/leads?${params.toString()}`);
     setLeads(await res.json());
+    setSelected(new Set());
     setLoading(false);
   }, [q, statusFilter]);
+
+  function toggleOne(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected((prev) =>
+      prev.size === leads.length ? new Set() : new Set(leads.map((l) => l.id))
+    );
+  }
+
+  async function runBulk(action: string, value?: string) {
+    if (selected.size === 0) return;
+    if (action === "delete") {
+      if (!confirm(`Delete ${selected.size} selected lead(s)? This cannot be undone.`))
+        return;
+    }
+    setBulkBusy(true);
+    await fetch("/api/leads/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selected), action, value }),
+    });
+    setBulkBusy(false);
+    setBulkStatus("");
+    setBulkAgent("");
+    load();
+  }
 
   useEffect(() => {
     const t = setTimeout(load, 200); // debounce search
@@ -166,10 +205,73 @@ export default function LeadsPage() {
         </select>
       </div>
 
+      {selected.size > 0 && (
+        <div className="bulk-bar">
+          <strong>{selected.size} selected</strong>
+          <span className="spacer" />
+          <select
+            value={bulkStatus}
+            onChange={(e) => {
+              setBulkStatus(e.target.value);
+              if (e.target.value) runBulk("status", e.target.value);
+            }}
+            disabled={bulkBusy}
+          >
+            <option value="">Set status…</option>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <input
+            placeholder="Assign agent…"
+            value={bulkAgent}
+            onChange={(e) => setBulkAgent(e.target.value)}
+            style={{ width: 150 }}
+            disabled={bulkBusy}
+          />
+          <button
+            className="btn btn-sm"
+            onClick={() => runBulk("assign", bulkAgent)}
+            disabled={bulkBusy}
+          >
+            Assign
+          </button>
+          <button
+            className="btn btn-sm btn-danger"
+            onClick={() => runBulk("delete")}
+            disabled={bulkBusy}
+          >
+            Delete
+          </button>
+          <button
+            className="btn btn-sm"
+            onClick={() => setSelected(new Set())}
+            disabled={bulkBusy}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       <div className="card">
         <table className="table">
           <thead>
             <tr>
+              <th className="check-col">
+                <input
+                  type="checkbox"
+                  checked={leads.length > 0 && selected.size === leads.length}
+                  ref={(el) => {
+                    if (el)
+                      el.indeterminate =
+                        selected.size > 0 && selected.size < leads.length;
+                  }}
+                  onChange={toggleAll}
+                  aria-label="Select all"
+                />
+              </th>
               <th>Name</th>
               <th>Company</th>
               <th>Phone</th>
@@ -181,7 +283,22 @@ export default function LeadsPage() {
           </thead>
           <tbody>
             {leads.map((l) => (
-              <tr key={l.id} onClick={() => router.push(`/leads/${l.id}`)}>
+              <tr
+                key={l.id}
+                className={selected.has(l.id) ? "row-selected" : ""}
+                onClick={() => router.push(`/leads/${l.id}`)}
+              >
+                <td
+                  className="check-col"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(l.id)}
+                    onChange={() => toggleOne(l.id)}
+                    aria-label={`Select ${l.name}`}
+                  />
+                </td>
                 <td>
                   <strong>{l.name}</strong>
                   <div className="muted" style={{ fontSize: 12 }}>

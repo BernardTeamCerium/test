@@ -27,14 +27,48 @@ interface Analytics {
   bySource: SourceRow[];
 }
 
+const PRESETS = [
+  { key: "all", label: "All time", days: 0 },
+  { key: "7", label: "Last 7 days", days: 7 },
+  { key: "30", label: "Last 30 days", days: 30 },
+  { key: "90", label: "Last 90 days", days: 90 },
+  { key: "custom", label: "Custom", days: -1 },
+];
+
+function isoDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [preset, setPreset] = useState("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  // Derive the effective range from the chosen preset (custom uses the inputs).
+  function rangeFor(p: string): { from: string; to: string } {
+    if (p === "all") return { from: "", to: "" };
+    if (p === "custom") return { from, to };
+    return { from: isoDaysAgo(Number(p)), to: isoDaysAgo(0) };
+  }
 
   useEffect(() => {
-    fetch("/api/analytics")
-      .then((r) => r.json())
-      .then(setData);
-  }, []);
+    const r = rangeFor(preset);
+    const qs = new URLSearchParams();
+    if (r.from) qs.set("from", r.from);
+    if (r.to) qs.set("to", r.to);
+    setLoading(true);
+    fetch(`/api/analytics?${qs.toString()}`)
+      .then((res) => res.json())
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset, from, to]);
 
   if (!data) return <div className="empty">Loading…</div>;
 
@@ -47,6 +81,35 @@ export default function AnalyticsPage() {
           <h1>Analytics</h1>
           <p>Conversions and spend efficiency across your pipeline.</p>
         </div>
+      </div>
+
+      {/* Date range filter */}
+      <div className="toolbar">
+        <select value={preset} onChange={(e) => setPreset(e.target.value)}>
+          {PRESETS.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+        {preset === "custom" && (
+          <>
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+            <span className="muted">to</span>
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </>
+        )}
+        {loading && <span className="muted">Updating…</span>}
       </div>
 
       {/* Headline metrics */}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import UserMenu from "./UserMenu";
 
 export const metadata: Metadata = {
   title: "Lead CRM",
@@ -20,10 +21,7 @@ export default function RootLayout({
             <Link href="/leads" className="brand">
               <span className="brand-dot" /> Lead CRM
             </Link>
-            <nav className="nav">
-              <Link href="/leads">Leads</Link>
-              <Link href="/analytics">Analytics</Link>
-            </nav>
+            <UserMenu />
           </div>
         </header>
         <main className="container">{children}</main>

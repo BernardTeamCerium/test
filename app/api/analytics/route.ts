@@ -1,13 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { STATUSES, CONVERTED_STATUSES, Lead } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/analytics -> headline metrics, funnel counts, and a per-source breakdown.
-export function GET() {
+// GET /api/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD
+// Headline metrics, funnel counts, and a per-source breakdown, optionally
+// scoped to leads created within an (inclusive) date range.
+export function GET(req: NextRequest) {
   const db = getDb();
-  const leads = db.prepare("SELECT * FROM leads").all() as Lead[];
+  const { searchParams } = new URL(req.url);
+  const from = searchParams.get("from"); // inclusive, by lead created_at date
+  const to = searchParams.get("to"); // inclusive
+
+  const where: string[] = [];
+  const params: Record<string, string> = {};
+  if (from) {
+    where.push("date(created_at) >= date(@from)");
+    params.from = from;
+  }
+  if (to) {
+    where.push("date(created_at) <= date(@to)");
+    params.to = to;
+  }
+  const sql =
+    "SELECT * FROM leads" +
+    (where.length ? " WHERE " + where.join(" AND ") : "");
+  const leads = db.prepare(sql).all(params) as Lead[];
 
   const totalLeads = leads.length;
   const totalSpend = leads.reduce((s, l) => s + (l.spend || 0), 0);

@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
+import { hashPassword } from "./password";
 
 // Store the SQLite file under ./data so it persists between runs but stays
 // out of version control (see .gitignore).
@@ -46,10 +47,32 @@ function createDb(): Database.Database {
     );
 
     CREATE INDEX IF NOT EXISTS idx_call_logs_lead ON call_logs(lead_id);
+
+    CREATE TABLE IF NOT EXISTS users (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      username      TEXT    NOT NULL UNIQUE,
+      password_hash TEXT    NOT NULL,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   seedIfEmpty(db);
+  seedAdminIfEmpty(db);
   return db;
+}
+
+// Seed an initial login so the app is usable on first run. Credentials come
+// from ADMIN_USERNAME / ADMIN_PASSWORD env vars, defaulting to admin / admin.
+function seedAdminIfEmpty(db: Database.Database) {
+  const count = db.prepare("SELECT COUNT(*) AS n FROM users").get() as {
+    n: number;
+  };
+  if (count.n > 0) return;
+  const username = process.env.ADMIN_USERNAME || "admin";
+  const password = process.env.ADMIN_PASSWORD || "admin";
+  db.prepare(
+    "INSERT INTO users (username, password_hash) VALUES (?, ?)"
+  ).run(username, hashPassword(password));
 }
 
 function seedIfEmpty(db: Database.Database) {

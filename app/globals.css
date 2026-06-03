@@ -76,6 +76,61 @@ a {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
+.nav-user {
+  color: #94a3b8;
+  font-size: 13px;
+  padding: 0 4px 0 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  margin-left: 6px;
+}
+.nav-logout {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nav-logout:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* ── Login ─────────────────────────────────────────── */
+.login-wrap {
+  min-height: calc(100vh - 120px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 30px 28px;
+}
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text);
+}
+.login-title {
+  font-size: 20px;
+  margin: 16px 0 18px;
+}
+.login-error {
+  background: #fef2f2;
+  color: var(--red);
+  border: 1px solid #fecaca;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin: 0 0 14px;
+}
 
 /* ── Layout ────────────────────────────────────────── */
 .container {
@@ -211,6 +266,36 @@ textarea:focus {
 .table tbody tr:hover {
   background: var(--surface-alt);
   cursor: pointer;
+}
+.table tbody tr.row-selected {
+  background: #eff6ff;
+}
+.check-col {
+  width: 38px;
+  text-align: center;
+}
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+/* ── Bulk action bar ───────────────────────────────── */
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--bg);
+  color: #e2e8f0;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+}
+.bulk-bar select,
+.bulk-bar input {
+  width: auto;
 }
 .table .num {
   text-align: right;

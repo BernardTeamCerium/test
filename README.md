@@ -6,14 +6,43 @@ to configure.
 
 ## What it does
 
-- **Leads page** — see every lead in your pipeline, search/filter them, and add
-  new leads through a built-in form. Data is stored in a real database.
+- **Login** — the app is protected by a sign-in screen; only authenticated
+  users can view or change leads.
+- **Leads page** — see every lead in your pipeline, search/filter them, add new
+  leads through a built-in form, and run **bulk actions** (set status, assign an
+  agent, or delete many leads at once via row checkboxes). Data is stored in a
+  real database.
 - **Lead detail page** — agents open a lead, **click to call** the phone number,
-  **log call outcomes**, and **move the lead through the funnel**
-  (New → Contacted → Qualified → Converted / Lost).
+  **log call outcomes**, **edit details**, and **move the lead through the
+  funnel** (New → Contacted → Qualified → Converted / Lost).
 - **Analytics page** — how many leads converted, your conversion rate, total ad
   spend, **cost per lead**, **cost per conversion**, revenue, ROI, a pipeline
-  funnel chart, and a per-source spend breakdown.
+  funnel chart, and a per-source spend breakdown — all filterable by a
+  **date range** (presets or custom).
+
+## Authentication
+
+The app requires login. On first run a single user is seeded:
+
+| Variable         | Default | Purpose                          |
+| ---------------- | ------- | -------------------------------- |
+| `ADMIN_USERNAME` | `admin` | Seed user's username             |
+| `ADMIN_PASSWORD` | `admin` | Seed user's password             |
+| `AUTH_SECRET`    | dev key | HMAC secret used to sign sessions|
+
+**Before deploying**, set a strong `AUTH_SECRET` and your own admin
+credentials, e.g. in a `.env.local` file:
+
+```
+AUTH_SECRET=some-long-random-string
+ADMIN_USERNAME=you@example.com
+ADMIN_PASSWORD=a-strong-password
+```
+
+Sessions are stateless signed cookies (HMAC-SHA256, 7-day expiry); passwords are
+hashed with scrypt. The seed user is only created when the `users` table is
+empty, so changing the env vars later won't overwrite an existing login —
+delete `data/crm.db` (or add more users) to reset.
 
 ## Continuous integration
 
