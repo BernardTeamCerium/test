@@ -68,9 +68,29 @@ data/
   crm.db            # the database (created at runtime, git-ignored)
 ```
 
-## Note on Google Sheets
+## Google Sheets / spreadsheet workflow
 
-This build uses a built-in database (chosen for reliability and zero setup). If
-you later want to push leads to / pull them from a Google Sheet, the API layer
-in `app/api/` is the place to add a sync step.
+Data lives in the built-in database, but you can move it in and out of Google
+Sheets (or Excel) via CSV — no API keys required:
+
+- **Export** — the **↓ Export CSV** button on the Leads page downloads every
+  lead. Open it directly in Google Sheets (File → Import) or Excel.
+- **Import** — the **↑ Import CSV** button uploads a CSV; each row with a name
+  becomes a lead. In Google Sheets use **File → Download → CSV**, then import
+  that file here.
+
+Import header matching is case-insensitive and accepts common aliases
+(`agent`/`owner` → assigned agent, `cost`/`ad spend` → spend, `revenue` →
+value, `stage` → status, etc.), so a sheet exported from most tools maps
+without renaming columns. The recommended columns are:
+
+```
+name, email, phone, company, source, status, spend, value, assigned_agent, notes
+```
+
+## Editing leads
+
+Open any lead and click **Edit** to update its details (name, contact info,
+source, spend, value, notes). Status changes happen from the lead's pipeline
+buttons or while logging a call.
 ```

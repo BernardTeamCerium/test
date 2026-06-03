@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { STATUSES, type Lead } from "@/lib/types";
 import { money } from "@/lib/format";
@@ -38,6 +38,8 @@ export default function LeadsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [importMsg, setImportMsg] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,6 +87,29 @@ export default function LeadsPage() {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<any>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportMsg("Importing…");
+    const csv = await file.text();
+    const res = await fetch("/api/leads/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ csv }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (e.target) e.target.value = ""; // allow re-importing the same file
+    if (!res.ok) {
+      setImportMsg(data.error || "Import failed.");
+      return;
+    }
+    setImportMsg(
+      `Imported ${data.imported} lead${data.imported === 1 ? "" : "s"}` +
+        (data.skipped ? ` · skipped ${data.skipped} (no name)` : "")
+    );
+    load();
+  }
+
   return (
     <>
       <div className="page-head">
@@ -92,10 +117,34 @@ export default function LeadsPage() {
           <h1>Leads</h1>
           <p>Every lead in your pipeline. Click a row to call and update it.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          + Add lead
-        </button>
+        <div className="inline">
+          <a className="btn" href="/api/leads/export">
+            ↓ Export CSV
+          </a>
+          <button className="btn" onClick={() => fileInput.current?.click()}>
+            ↑ Import CSV
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: "none" }}
+            onChange={onImportFile}
+          />
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+            + Add lead
+          </button>
+        </div>
       </div>
+
+      {importMsg && (
+        <div
+          className="card card-pad"
+          style={{ marginBottom: 16, color: "var(--muted)" }}
+        >
+          {importMsg}
+        </div>
+      )}
 
       <div className="toolbar">
         <input

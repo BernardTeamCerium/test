@@ -10,6 +10,28 @@ type LeadWithCalls = Lead & { calls: CallLog[] };
 
 const OUTCOMES = ["Answered", "Voicemail", "No answer", "Wrong number", "Callback requested"];
 
+const SOURCES = [
+  "Facebook Ads",
+  "Google Ads",
+  "LinkedIn",
+  "Referral",
+  "Website",
+  "Cold Outreach",
+  "Other",
+];
+
+const EDIT_FIELDS = [
+  "name",
+  "email",
+  "phone",
+  "company",
+  "source",
+  "assigned_agent",
+  "spend",
+  "value",
+  "notes",
+] as const;
+
 export default function LeadDetailPage({
   params,
 }: {
@@ -26,6 +48,11 @@ export default function LeadDetailPage({
   const [callNote, setCallNote] = useState("");
   const [newStatus, setNewStatus] = useState("");
   const [loggingCall, setLoggingCall] = useState(false);
+
+  // Edit-lead modal
+  const [showEdit, setShowEdit] = useState(false);
+  const [edit, setEdit] = useState<Record<string, string>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/leads/${params.id}`);
@@ -68,6 +95,34 @@ export default function LeadDetailPage({
     load();
   }
 
+  function openEdit() {
+    if (!lead) return;
+    const init: Record<string, string> = {};
+    for (const f of EDIT_FIELDS) init[f] = String((lead as any)[f] ?? "");
+    setEdit(init);
+    setShowEdit(true);
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingEdit(true);
+    await fetch(`/api/leads/${params.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...edit,
+        spend: Number(edit.spend) || 0,
+        value: Number(edit.value) || 0,
+      }),
+    });
+    setSavingEdit(false);
+    setShowEdit(false);
+    load();
+  }
+
+  const setField = (k: string) => (e: React.ChangeEvent<any>) =>
+    setEdit((s) => ({ ...s, [k]: e.target.value }));
+
   async function remove() {
     if (!confirm("Delete this lead permanently?")) return;
     await fetch(`/api/leads/${params.id}`, { method: "DELETE" });
@@ -103,6 +158,9 @@ export default function LeadDetailPage({
               📞 Call {lead.phone}
             </a>
           )}
+          <button className="btn" onClick={openEdit}>
+            Edit
+          </button>
           <button className="btn btn-danger" onClick={remove}>
             Delete
           </button>
@@ -237,6 +295,111 @@ export default function LeadDetailPage({
           </div>
         </div>
       </div>
+
+      {showEdit && (
+        <div className="modal-backdrop" onClick={() => setShowEdit(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <form onSubmit={saveEdit}>
+              <div className="modal-head">
+                <h2>Edit lead</h2>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => setShowEdit(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="form-grid">
+                  <div className="field full">
+                    <label>Name *</label>
+                    <input value={edit.name} onChange={setField("name")} />
+                  </div>
+                  <div className="field">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={edit.email}
+                      onChange={setField("email")}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Phone</label>
+                    <input value={edit.phone} onChange={setField("phone")} />
+                  </div>
+                  <div className="field">
+                    <label>Company</label>
+                    <input
+                      value={edit.company}
+                      onChange={setField("company")}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Assigned agent</label>
+                    <input
+                      value={edit.assigned_agent}
+                      onChange={setField("assigned_agent")}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Source</label>
+                    <select value={edit.source} onChange={setField("source")}>
+                      {SOURCES.map((s) => (
+                        <option key={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Ad spend / acquisition cost ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={edit.spend}
+                      onChange={setField("spend")}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Deal value ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={edit.value}
+                      onChange={setField("value")}
+                    />
+                  </div>
+                  <div className="field full">
+                    <label>Notes</label>
+                    <textarea
+                      rows={3}
+                      value={edit.notes}
+                      onChange={setField("notes")}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-foot">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setShowEdit(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingEdit}
+                >
+                  {savingEdit ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }
