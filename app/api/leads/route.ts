@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { logActivity } from "@/lib/activity";
 import { STATUSES } from "@/lib/types";
 
 // Always run on the server at request time (uses the SQLite file).
@@ -62,6 +63,14 @@ export async function POST(req: NextRequest) {
       assigned_agent: String(body.assigned_agent ?? "").trim(),
       notes: String(body.notes ?? "").trim(),
     });
+
+  logActivity(
+    db,
+    info.lastInsertRowid as number,
+    "created",
+    `Lead created with status ${status}`,
+    String(body.assigned_agent ?? "").trim()
+  );
 
   const lead = db
     .prepare("SELECT * FROM leads WHERE id = ?")

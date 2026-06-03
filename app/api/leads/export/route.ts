@@ -1,6 +1,7 @@
+import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import { toCsv } from "@/lib/csv";
-import { Lead } from "@/lib/types";
+import { Lead, STATUSES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,32 @@ const COLUMNS: (keyof Lead)[] = [
   "updated_at",
 ];
 
-// GET /api/leads/export -> CSV download of all leads (open in Google Sheets / Excel).
-export function GET() {
+// GET /api/leads/export?status=&q= -> CSV download of leads matching the same
+// filters as the Leads page (open in Google Sheets / Excel).
+export function GET(req: NextRequest) {
   const db = getDb();
-  const leads = db
-    .prepare("SELECT * FROM leads ORDER BY datetime(created_at) DESC, id DESC")
-    .all() as Lead[];
+  const { searchParams } = new URL(req.url);
+  const status = searchParams.get("status");
+  const q = searchParams.get("q");
+
+  const where: string[] = [];
+  const params: Record<string, unknown> = {};
+  if (status && STATUSES.includes(status as any)) {
+    where.push("status = @status");
+    params.status = status;
+  }
+  if (q) {
+    where.push(
+      "(name LIKE @q OR email LIKE @q OR company LIKE @q OR phone LIKE @q)"
+    );
+    params.q = `%${q}%`;
+  }
+
+  const sql =
+    "SELECT * FROM leads" +
+    (where.length ? " WHERE " + where.join(" AND ") : "") +
+    " ORDER BY datetime(created_at) DESC, id DESC";
+  const leads = db.prepare(sql).all(params) as Lead[];
 
   const rows = leads.map((l) => COLUMNS.map((c) => l[c] as string | number));
   const csv = toCsv(COLUMNS as string[], rows);

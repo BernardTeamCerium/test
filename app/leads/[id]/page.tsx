@@ -6,7 +6,22 @@ import Link from "next/link";
 import { STATUSES, type Lead, type CallLog } from "@/lib/types";
 import { money, dateTime } from "@/lib/format";
 
-type LeadWithCalls = Lead & { calls: CallLog[] };
+interface TimelineItem {
+  kind: "call" | "created" | "status" | "edited";
+  title: string;
+  detail: string;
+  actor: string;
+  created_at: string;
+}
+
+type LeadWithCalls = Lead & { calls: CallLog[]; timeline: TimelineItem[] };
+
+const TIMELINE_ICON: Record<TimelineItem["kind"], string> = {
+  call: "📞",
+  created: "✨",
+  status: "🔄",
+  edited: "✏️",
+};
 
 const OUTCOMES = ["Answered", "Voicemail", "No answer", "Wrong number", "Callback requested"];
 
@@ -277,19 +292,20 @@ export default function LeadDetailPage({
 
           <div className="card card-pad">
             <h3 className="section-title">
-              Call history ({lead.calls.length})
+              Activity timeline ({lead.timeline.length})
             </h3>
-            {lead.calls.length === 0 && (
-              <p className="muted">No calls logged yet.</p>
+            {lead.timeline.length === 0 && (
+              <p className="muted">No activity yet.</p>
             )}
-            {lead.calls.map((c) => (
-              <div className="call-item" key={c.id}>
+            {lead.timeline.map((t, i) => (
+              <div className="call-item" key={i}>
                 <div>
-                  <strong>{c.outcome || "Call"}</strong>
-                  {c.agent && ` · ${c.agent}`}
+                  <span style={{ marginRight: 6 }}>{TIMELINE_ICON[t.kind]}</span>
+                  <strong>{t.title}</strong>
+                  {t.actor && ` · ${t.actor}`}
                 </div>
-                {c.note && <div>{c.note}</div>}
-                <div className="call-meta">{dateTime(c.created_at)}</div>
+                {t.detail && <div>{t.detail}</div>}
+                <div className="call-meta">{dateTime(t.created_at)}</div>
               </div>
             ))}
           </div>

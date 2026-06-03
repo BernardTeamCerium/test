@@ -14,6 +14,16 @@ interface SourceRow {
   conversionRate: number;
 }
 
+interface AgentRow {
+  agent: string;
+  leads: number;
+  converted: number;
+  conversionRate: number;
+  spend: number;
+  value: number;
+  calls: number;
+}
+
 interface Analytics {
   totalLeads: number;
   converted: number;
@@ -25,6 +35,7 @@ interface Analytics {
   roi: number;
   funnel: { status: string; count: number }[];
   bySource: SourceRow[];
+  byAgent: AgentRow[];
 }
 
 const PRESETS = [
@@ -203,6 +214,44 @@ export default function AnalyticsPage() {
           </tbody>
         </table>
         {data.bySource.length === 0 && (
+          <div className="empty">No data yet.</div>
+        )}
+      </div>
+
+      {/* Per-agent performance */}
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="card-pad" style={{ paddingBottom: 0 }}>
+          <h3 className="section-title">Agent performance</h3>
+        </div>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Agent</th>
+              <th className="num">Leads</th>
+              <th className="num">Calls logged</th>
+              <th className="num">Converted</th>
+              <th className="num">Conv. rate</th>
+              <th className="num">Spend</th>
+              <th className="num">Revenue</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.byAgent.map((a) => (
+              <tr key={a.agent} style={{ cursor: "default" }}>
+                <td>
+                  <strong>{a.agent}</strong>
+                </td>
+                <td className="num">{a.leads}</td>
+                <td className="num">{a.calls}</td>
+                <td className="num">{a.converted}</td>
+                <td className="num">{percent(a.conversionRate)}</td>
+                <td className="num">{money(a.spend)}</td>
+                <td className="num">{money(a.value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {data.byAgent.length === 0 && (
           <div className="empty">No data yet.</div>
         )}
       </div>

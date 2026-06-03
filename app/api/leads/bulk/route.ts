@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { logActivity } from "@/lib/activity";
 import { STATUSES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest) {
       )
       .run(status, ...ids);
     affected = info.changes;
+    for (const id of ids) {
+      logActivity(db, id, "status", `Status set to ${status} (bulk)`);
+    }
   } else if (action === "assign") {
     const agent = String(body.value ?? "").trim();
     const info = db

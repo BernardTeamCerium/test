@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { logActivity } from "@/lib/activity";
 import { STATUSES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,22 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
 
   // If the agent picked a new status while logging the call, apply it.
-  if (body.status && STATUSES.includes(body.status)) {
+  if (
+    body.status &&
+    STATUSES.includes(body.status) &&
+    body.status !== (lead as any).status
+  ) {
+    logActivity(
+      db,
+      params.id,
+      "status",
+      `${(lead as any).status} → ${body.status}`,
+      String(body.agent ?? "").trim()
+    );
+    db.prepare(
+      "UPDATE leads SET status = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(body.status, params.id);
+  } else if (body.status && STATUSES.includes(body.status)) {
     db.prepare(
       "UPDATE leads SET status = ?, updated_at = datetime('now') WHERE id = ?"
     ).run(body.status, params.id);

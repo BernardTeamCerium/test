@@ -43,10 +43,22 @@ function createDb(): Database.Database {
       agent      TEXT    NOT NULL DEFAULT '',
       outcome    TEXT    NOT NULL DEFAULT '',
       note       TEXT    NOT NULL DEFAULT '',
-      created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+      -- Millisecond precision so the activity timeline orders same-second events.
+      created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_call_logs_lead ON call_logs(lead_id);
+
+    CREATE TABLE IF NOT EXISTS activities (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id    INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+      type       TEXT    NOT NULL,            -- created | status | edited
+      detail     TEXT    NOT NULL DEFAULT '',
+      actor      TEXT    NOT NULL DEFAULT '',
+      created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_activities_lead ON activities(lead_id);
 
     CREATE TABLE IF NOT EXISTS users (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,

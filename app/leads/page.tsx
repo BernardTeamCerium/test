@@ -157,7 +157,13 @@ export default function LeadsPage() {
           <p>Every lead in your pipeline. Click a row to call and update it.</p>
         </div>
         <div className="inline">
-          <a className="btn" href="/api/leads/export">
+          <a
+            className="btn"
+            href={`/api/leads/export?${new URLSearchParams({
+              ...(q ? { q } : {}),
+              ...(statusFilter ? { status: statusFilter } : {}),
+            }).toString()}`}
+          >
             ↓ Export CSV
           </a>
           <button className="btn" onClick={() => fileInput.current?.click()}>

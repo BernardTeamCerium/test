@@ -13,12 +13,17 @@ to configure.
   agent, or delete many leads at once via row checkboxes). Data is stored in a
   real database.
 - **Lead detail page** — agents open a lead, **click to call** the phone number,
-  **log call outcomes**, **edit details**, and **move the lead through the
-  funnel** (New → Contacted → Qualified → Converted / Lost).
+  **log call outcomes**, **edit details**, **move the lead through the funnel**
+  (New → Contacted → Qualified → Converted / Lost), and see an **activity
+  timeline** combining calls, status changes, and edits.
 - **Analytics page** — how many leads converted, your conversion rate, total ad
   spend, **cost per lead**, **cost per conversion**, revenue, ROI, a pipeline
-  funnel chart, and a per-source spend breakdown — all filterable by a
-  **date range** (presets or custom).
+  funnel chart, a **per-source** spend breakdown, and a **per-agent
+  performance** table (leads, calls logged, conversions, spend) — all filterable
+  by a **date range** (presets or custom).
+
+CSV export honors the active search/status filters, so you can export just the
+slice you're looking at.
 
 ## Authentication
 

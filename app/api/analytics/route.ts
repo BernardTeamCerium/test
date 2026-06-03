@@ -71,6 +71,57 @@ export function GET(req: NextRequest) {
     }))
     .sort((a, b) => b.spend - a.spend);
 
+  // Per-agent performance. Leads/conversions/spend are keyed by the lead's
+  // assigned agent; calls logged are counted from call_logs by the calling
+  // agent (matched by name), within the same date window.
+  const agentMap = new Map<
+    string,
+    { agent: string; leads: number; converted: number; spend: number; value: number; calls: number }
+  >();
+  const agentRow = (name: string) => {
+    const key = name || "Unassigned";
+    let row = agentMap.get(key);
+    if (!row) {
+      row = { agent: key, leads: 0, converted: 0, spend: 0, value: 0, calls: 0 };
+      agentMap.set(key, row);
+    }
+    return row;
+  };
+  for (const l of leads) {
+    const row = agentRow(l.assigned_agent);
+    row.leads += 1;
+    row.spend += l.spend || 0;
+    row.value += l.value || 0;
+    if (CONVERTED_STATUSES.includes(l.status)) row.converted += 1;
+  }
+
+  // Calls logged per agent in the same range.
+  const callWhere: string[] = ["agent != ''"];
+  const callParams: Record<string, string> = {};
+  if (from) {
+    callWhere.push("date(created_at) >= date(@from)");
+    callParams.from = from;
+  }
+  if (to) {
+    callWhere.push("date(created_at) <= date(@to)");
+    callParams.to = to;
+  }
+  const callCounts = db
+    .prepare(
+      `SELECT agent, COUNT(*) AS n FROM call_logs WHERE ${callWhere.join(
+        " AND "
+      )} GROUP BY agent`
+    )
+    .all(callParams) as { agent: string; n: number }[];
+  for (const c of callCounts) agentRow(c.agent).calls += c.n;
+
+  const byAgent = Array.from(agentMap.values())
+    .map((r) => ({
+      ...r,
+      conversionRate: r.leads ? r.converted / r.leads : 0,
+    }))
+    .sort((a, b) => b.converted - a.converted || b.leads - a.leads);
+
   return NextResponse.json({
     totalLeads,
     converted,
@@ -82,5 +133,6 @@ export function GET(req: NextRequest) {
     roi,
     funnel,
     bySource,
+    byAgent,
   });
 }
