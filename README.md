@@ -15,6 +15,12 @@ to configure.
   spend, **cost per lead**, **cost per conversion**, revenue, ROI, a pipeline
   funnel chart, and a per-source spend breakdown.
 
+## Continuous integration
+
+Every push and pull request runs **lint + build** via GitHub Actions
+(`.github/workflows/ci.yml`) on Node 20, so broken code is caught before merge.
+Run the same checks locally with `npm run lint` and `npm run build`.
+
 ## Quick start
 
 ```bash
