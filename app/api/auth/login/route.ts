@@ -14,7 +14,9 @@ export async function POST(req: NextRequest) {
 
   const user = db
     .prepare("SELECT * FROM users WHERE username = ?")
-    .get(username) as { username: string; password_hash: string } | undefined;
+    .get(username) as
+    | { username: string; password_hash: string; role: string }
+    | undefined;
 
   if (!user || !verifyPassword(password, user.password_hash)) {
     return NextResponse.json(
@@ -23,8 +25,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const token = await signToken(user.username);
-  const res = NextResponse.json({ username: user.username });
+  const token = await signToken(user.username, user.role);
+  const res = NextResponse.json({ username: user.username, role: user.role });
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",

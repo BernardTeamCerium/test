@@ -64,13 +64,29 @@ function createDb(): Database.Database {
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       username      TEXT    NOT NULL UNIQUE,
       password_hash TEXT    NOT NULL,
+      role          TEXT    NOT NULL DEFAULT 'agent',  -- 'admin' | 'agent'
       created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
     );
   `);
 
+  migrate(db);
   seedIfEmpty(db);
   seedAdminIfEmpty(db);
   return db;
+}
+
+// Lightweight migrations for databases created before a column existed.
+function migrate(db: Database.Database) {
+  const cols = db.prepare("PRAGMA table_info(users)").all() as {
+    name: string;
+  }[];
+  if (!cols.some((c) => c.name === "role")) {
+    db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'agent'");
+    const adminName = process.env.ADMIN_USERNAME || "admin";
+    db.prepare("UPDATE users SET role = 'admin' WHERE username = ?").run(
+      adminName
+    );
+  }
 }
 
 // Seed an initial login so the app is usable on first run. Credentials come
@@ -84,15 +100,15 @@ function seedAdminIfEmpty(db: Database.Database) {
   if (count.n > 0) return;
 
   const insert = db.prepare(
-    "INSERT INTO users (username, password_hash) VALUES (?, ?)"
+    "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)"
   );
   const username = process.env.ADMIN_USERNAME || "admin";
   const password = process.env.ADMIN_PASSWORD || "admin";
-  insert.run(username, hashPassword(password));
+  insert.run(username, hashPassword(password), "admin");
 
   for (const agent of ["Dana", "Miguel", "Priya"]) {
     if (agent === username) continue;
-    insert.run(agent, hashPassword("changeme"));
+    insert.run(agent, hashPassword("changeme"), "agent");
   }
 }
 

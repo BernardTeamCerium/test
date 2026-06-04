@@ -50,13 +50,28 @@ hashed with scrypt. The seed user is only created when the `users` table is
 empty, so changing the env vars later won't overwrite an existing login —
 delete `data/crm.db` (or add more users) to reset.
 
+### Roles & access
+
+Every user is either an **admin** or an **agent**:
+
+- **Agents** can manage leads, log calls, and change their own password.
+- **Admins** can additionally add/remove users, set roles, and reset any user's
+  password. User-management endpoints are enforced server-side (agents get
+  `403`), not just hidden in the UI.
+
+The seeded `admin` user is an admin; the demo agents are agents. Everyone can
+change their own password from **Settings → Your account**.
+
+When an admin deletes a user, they choose where that user's leads go — reassign
+them to another user or leave them **Unassigned** — so no leads are orphaned.
+
 ### Agents & users
 
-People who can log in are managed on the **Settings** page (add or remove
-agents). Each agent is a real user, and lead assignment uses a **dropdown of
-those users** everywhere (add-lead form, edit, bulk assign, and the call-logging
-agent) — so assignments always match a login and the **"My leads"** filter and
-per-agent analytics line up reliably.
+People who can log in are managed on the **Settings** page (admins only). Each
+agent is a real user, and lead assignment uses a **dropdown of those users**
+everywhere (add-lead form, edit, bulk assign, and the call-logging agent) — so
+assignments always match a login and the **"My leads"** filter and per-agent
+analytics line up reliably.
 
 For convenience the demo seeds three agent logins — **Dana**, **Miguel**, and
 **Priya** (password `changeme`) — matching the sample leads. Change or remove

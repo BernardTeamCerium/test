@@ -7,6 +7,7 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
 export interface SessionPayload {
   username: string;
+  role: string; // 'admin' | 'agent'
   exp: number; // epoch ms
 }
 
@@ -47,10 +48,14 @@ async function hmacKey(): Promise<CryptoKey> {
   );
 }
 
-// Create a signed token for a username, valid for SESSION_TTL_MS.
-export async function signToken(username: string): Promise<string> {
+// Create a signed token for a user, valid for SESSION_TTL_MS.
+export async function signToken(
+  username: string,
+  role = "agent"
+): Promise<string> {
   const payload: SessionPayload = {
     username,
+    role,
     exp: Date.now() + SESSION_TTL_MS,
   };
   const p = toB64url(encoder.encode(JSON.stringify(payload)));
