@@ -41,13 +41,13 @@ export interface Lead {
   updated_at: string;
 }
 
-// Admin-entered ad spend, recorded per source and per date. Ad spend lives only
-// on the analytics side now (it is no longer a per-lead field).
+// Admin-entered ad spend, recorded per source and per calendar month. Ad spend
+// lives only on the analytics side now (it is no longer a per-lead field).
 export interface AdSpend {
   id: number;
   source: string;
   amount: number; // dollars spent
-  spend_date: string; // YYYY-MM-DD the spend is attributed to
+  spend_month: string; // YYYY-MM the spend is attributed to
   created_at: string;
 }
 

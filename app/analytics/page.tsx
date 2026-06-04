@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { money, percent, dateTime } from "@/lib/format";
+import { money, percent, dateTime, monthLabel } from "@/lib/format";
 import { SOURCES, type AdSpend } from "@/lib/types";
 
 interface SourceRow {
@@ -38,32 +38,50 @@ interface Analytics {
   byAgent: AgentRow[];
 }
 
+// Spend and metrics are viewed by calendar month, so the presets select a
+// number of months back (months: 1 = the current month only).
 const PRESETS = [
-  { key: "all", label: "All time", days: 0 },
-  { key: "7", label: "Last 7 days", days: 7 },
-  { key: "30", label: "Last 30 days", days: 30 },
-  { key: "90", label: "Last 90 days", days: 90 },
-  { key: "custom", label: "Custom", days: -1 },
+  { key: "all", label: "All time", months: 0 },
+  { key: "1", label: "This month", months: 1 },
+  { key: "3", label: "Last 3 months", months: 3 },
+  { key: "6", label: "Last 6 months", months: 6 },
+  { key: "12", label: "Last 12 months", months: 12 },
+  { key: "custom", label: "Custom", months: -1 },
 ];
 
-function isoDaysAgo(days: number): string {
+// YYYY-MM for the calendar month N months before the current one.
+function monthsAgo(n: number): string {
   const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  d.setDate(1);
+  d.setMonth(d.getMonth() - n);
+  return d.toISOString().slice(0, 7);
+}
+
+// First day (YYYY-MM-01) of a YYYY-MM month.
+function monthStart(month: string): string {
+  return `${month}-01`;
+}
+
+// Last calendar day (YYYY-MM-DD) of a YYYY-MM month.
+function monthEnd(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${month}-${String(last).padStart(2, "0")}`;
 }
 
 const emptySpendForm = {
   source: SOURCES[0] as string,
   amount: "",
-  spend_date: isoDaysAgo(0),
+  spend_month: monthsAgo(0),
 };
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [preset, setPreset] = useState("all");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  // Custom range is chosen by month (YYYY-MM).
+  const [fromMonth, setFromMonth] = useState("");
+  const [toMonth, setToMonth] = useState("");
 
   // Admin-only ad-spend management.
   const [isAdmin, setIsAdmin] = useState(false);
@@ -72,14 +90,25 @@ export default function AnalyticsPage() {
   const [savingSpend, setSavingSpend] = useState(false);
   const [spendError, setSpendError] = useState("");
 
-  // Derive the effective range from the chosen preset (custom uses the inputs).
+  // Derive the effective date range from the chosen preset. Custom uses the
+  // month inputs; numeric presets span that many calendar months up to and
+  // including the current month.
   const rangeFor = useCallback(
     (p: string): { from: string; to: string } => {
       if (p === "all") return { from: "", to: "" };
-      if (p === "custom") return { from, to };
-      return { from: isoDaysAgo(Number(p)), to: isoDaysAgo(0) };
+      if (p === "custom") {
+        return {
+          from: fromMonth ? monthStart(fromMonth) : "",
+          to: toMonth ? monthEnd(toMonth) : "",
+        };
+      }
+      const months = Number(p);
+      return {
+        from: monthStart(monthsAgo(months - 1)),
+        to: monthEnd(monthsAgo(0)),
+      };
     },
-    [from, to]
+    [fromMonth, toMonth]
   );
 
   // Build the from/to query string for the current range.
@@ -184,17 +213,17 @@ export default function AnalyticsPage() {
         {preset === "custom" && (
           <>
             <input
-              type="date"
-              value={from}
-              max={to || undefined}
-              onChange={(e) => setFrom(e.target.value)}
+              type="month"
+              value={fromMonth}
+              max={toMonth || undefined}
+              onChange={(e) => setFromMonth(e.target.value)}
             />
             <span className="muted">to</span>
             <input
-              type="date"
-              value={to}
-              min={from || undefined}
-              onChange={(e) => setTo(e.target.value)}
+              type="month"
+              value={toMonth}
+              min={fromMonth || undefined}
+              onChange={(e) => setToMonth(e.target.value)}
             />
           </>
         )}
@@ -303,8 +332,8 @@ export default function AnalyticsPage() {
           <div className="card-pad" style={{ paddingBottom: 0 }}>
             <h3 className="section-title">Manage ad spend</h3>
             <p className="muted" style={{ marginTop: 0 }}>
-              Record ad spend per source and date. Entries within the selected
-              date range feed the metrics above.
+              Record ad spend per source and month. Entries within the selected
+              month range feed the metrics above.
             </p>
             <form onSubmit={addSpend} className="toolbar" style={{ marginBottom: 16 }}>
               <select value={spendForm.source} onChange={setSpendField("source")}>
@@ -313,9 +342,9 @@ export default function AnalyticsPage() {
                 ))}
               </select>
               <input
-                type="date"
-                value={spendForm.spend_date}
-                onChange={setSpendField("spend_date")}
+                type="month"
+                value={spendForm.spend_month}
+                onChange={setSpendField("spend_month")}
               />
               <input
                 type="number"
@@ -340,7 +369,7 @@ export default function AnalyticsPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Date</th>
+                <th>Month</th>
                 <th>Source</th>
                 <th className="num">Amount</th>
                 <th className="num">Recorded</th>
@@ -350,7 +379,7 @@ export default function AnalyticsPage() {
             <tbody>
               {adSpend.map((e) => (
                 <tr key={e.id} style={{ cursor: "default" }}>
-                  <td>{e.spend_date}</td>
+                  <td>{monthLabel(e.spend_month)}</td>
                   <td>{e.source}</td>
                   <td className="num">{money(e.amount)}</td>
                   <td className="num muted">{dateTime(e.created_at)}</td>
@@ -368,7 +397,7 @@ export default function AnalyticsPage() {
           </table>
           {adSpend.length === 0 && (
             <div className="empty">
-              No ad spend recorded for this date range yet.
+              No ad spend recorded for this month range yet.
             </div>
           )}
         </div>

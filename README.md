@@ -21,8 +21,8 @@ serverless hosts like Vercel with real persistence.
 - **Analytics page** — how many leads converted, your conversion rate, total ad
   spend, **cost per lead**, **cost per conversion**, revenue, ROI, a pipeline
   funnel chart, a **per-source** spend breakdown, and a **per-agent
-  performance** table (leads, calls logged, conversions, spend) — all filterable
-  by a **date range** (presets or custom).
+  performance** table (leads, calls logged, conversions) — all filterable
+  by **month** (presets or a custom month range).
 
 CSV export honors the active search/status filters, so you can export just the
 slice you're looking at.
@@ -150,8 +150,10 @@ assigned agent, and notes. Each **call** logs the agent, outcome, a note, and a
 timestamp, and can update the lead's status in one step.
 
 **Ad spend** is no longer tracked per lead. Admins record it on the **Analytics**
-tab, per source and per date (the `ad_spend` table). Spend within the selected
-date range feeds the cost-per-lead, cost-per-conversion, and ROI metrics.
+tab, per source and per calendar month (the `ad_spend` table). The dashboard is
+filterable by month (this month, last 3/6/12 months, or a custom month range),
+and spend in the selected months feeds the cost-per-lead, cost-per-conversion,
+and ROI metrics.
 
 ## How the metrics are calculated
 

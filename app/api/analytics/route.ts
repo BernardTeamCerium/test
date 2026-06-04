@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 // GET /api/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD
 // Headline metrics, funnel counts, and a per-source breakdown, optionally
 // scoped to a date range. Leads are scoped by created_at; ad spend (entered by
-// admins, per source/date) is scoped by spend_date over the same window.
+// admins, per source/month) is scoped by spend_month over the same window.
 export async function GET(req: NextRequest) {
   const db = await getDb();
   const { searchParams } = new URL(req.url);
@@ -31,15 +31,17 @@ export async function GET(req: NextRequest) {
   const leads = (await db.prepare(sql).all(params)) as Lead[];
 
   // ── Ad spend in range, grouped by source ───────────────────────────────────
+  // Ad spend is recorded per calendar month, so a date window maps to the
+  // months it spans (the from/to months, inclusive).
   const spendWhere: string[] = [];
   const spendParams: Record<string, string> = {};
   if (from) {
-    spendWhere.push("date(spend_date) >= date(@from)");
-    spendParams.from = from;
+    spendWhere.push("spend_month >= @fromMonth");
+    spendParams.fromMonth = from.slice(0, 7);
   }
   if (to) {
-    spendWhere.push("date(spend_date) <= date(@to)");
-    spendParams.to = to;
+    spendWhere.push("spend_month <= @toMonth");
+    spendParams.toMonth = to.slice(0, 7);
   }
   const spendRows = (await db
     .prepare(
