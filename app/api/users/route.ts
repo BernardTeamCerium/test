@@ -10,7 +10,7 @@ export function GET() {
   const db = getDb();
   const users = db
     .prepare(
-      "SELECT id, username, role, created_at FROM users ORDER BY username COLLATE NOCASE"
+      "SELECT id, username, role, status, created_at FROM users ORDER BY username COLLATE NOCASE"
     )
     .all();
   return NextResponse.json(users);

@@ -7,6 +7,7 @@ interface User {
   id: number;
   username: string;
   role: string;
+  status: string;
   created_at: string;
 }
 
@@ -82,6 +83,28 @@ export default function SettingsPage() {
     setCurPw("");
     setNewPw("");
     setPwMsg("Password updated.");
+  }
+
+  async function approve(u: User) {
+    const res = await fetch(`/api/users/${u.id}/approve`, { method: "POST" });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error || "Could not approve user.");
+      return;
+    }
+    load();
+  }
+
+  async function reject(u: User) {
+    if (!confirm(`Reject and remove the access request from "${u.username}"?`))
+      return;
+    const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error || "Could not reject user.");
+      return;
+    }
+    load();
   }
 
   async function resetPassword(u: User) {
@@ -208,6 +231,61 @@ export default function SettingsPage() {
         )}
       </div>
 
+      {/* Pending approvals — admins only */}
+      {isAdmin && users.some((u) => u.status === "pending") && (
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="card-pad" style={{ paddingBottom: 0 }}>
+            <h3 className="section-title">
+              Pending approvals (
+              {users.filter((u) => u.status === "pending").length})
+            </h3>
+            <p className="muted" style={{ marginTop: 0 }}>
+              People who requested access. Approve to let them sign in.
+            </p>
+          </div>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Email / username</th>
+                <th>Requested</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {users
+                .filter((u) => u.status === "pending")
+                .map((u) => (
+                  <tr key={u.id} style={{ cursor: "default" }}>
+                    <td>
+                      <strong>{u.username}</strong>
+                    </td>
+                    <td>{dateTime(u.created_at)}</td>
+                    <td className="num">
+                      <div
+                        className="inline"
+                        style={{ justifyContent: "flex-end" }}
+                      >
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => approve(u)}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => reject(u)}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* User list — admins only */}
       {isAdmin && (
         <div className="card" style={{ marginTop: 20 }}>
@@ -219,6 +297,7 @@ export default function SettingsPage() {
               <tr>
                 <th>Username</th>
                 <th>Role</th>
+                <th>Status</th>
                 <th>Added</th>
                 <th></th>
               </tr>
@@ -238,6 +317,13 @@ export default function SettingsPage() {
                   <td>
                     <span className={`badge badge-${u.role === "admin" ? "Converted" : "New"}`}>
                       {u.role}
+                    </span>
+                  </td>
+                  <td>
+                    <span
+                      className={`badge badge-${u.status === "pending" ? "Contacted" : "Qualified"}`}
+                    >
+                      {u.status}
                     </span>
                   </td>
                   <td>{dateTime(u.created_at)}</td>

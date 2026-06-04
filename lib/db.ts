@@ -64,15 +64,26 @@ function createDb(): Database.Database {
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       username      TEXT    NOT NULL UNIQUE,
       password_hash TEXT    NOT NULL,
-      role          TEXT    NOT NULL DEFAULT 'agent',  -- 'admin' | 'agent'
+      role          TEXT    NOT NULL DEFAULT 'agent',   -- 'admin' | 'agent'
+      status        TEXT    NOT NULL DEFAULT 'active',  -- 'active' | 'pending'
       created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
     );
   `);
 
   migrate(db);
   seedIfEmpty(db);
-  seedAdminIfEmpty(db);
+  seedAgentsIfEmpty(db);
+  ensureAdmin(db);
   return db;
+}
+
+// The bootstrap admin account. Override with env vars; defaults to the project
+// owner so the app has a working admin out of the box.
+function adminUsername() {
+  return process.env.ADMIN_USERNAME || "bernard@teamcerium.com";
+}
+function adminPassword() {
+  return process.env.ADMIN_PASSWORD || "changeme";
 }
 
 // Lightweight migrations for databases created before a column existed.
@@ -80,35 +91,54 @@ function migrate(db: Database.Database) {
   const cols = db.prepare("PRAGMA table_info(users)").all() as {
     name: string;
   }[];
-  if (!cols.some((c) => c.name === "role")) {
+  const has = (name: string) => cols.some((c) => c.name === name);
+
+  if (!has("role")) {
     db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'agent'");
-    const adminName = process.env.ADMIN_USERNAME || "admin";
     db.prepare("UPDATE users SET role = 'admin' WHERE username = ?").run(
-      adminName
+      adminUsername()
+    );
+  }
+  if (!has("status")) {
+    // Existing accounts predate approval, so treat them all as active.
+    db.exec(
+      "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
     );
   }
 }
 
-// Seed an initial login so the app is usable on first run. Credentials come
-// from ADMIN_USERNAME / ADMIN_PASSWORD env vars, defaulting to admin / admin.
-// The demo agents referenced by the seed leads are also created as real users
-// (default password "changeme") so lead assignments line up with logins.
-function seedAdminIfEmpty(db: Database.Database) {
+// Guarantee the configured admin always exists as an active admin, so you can
+// never be locked out (works on fresh and existing databases alike). If the
+// account already exists, its password is left untouched.
+function ensureAdmin(db: Database.Database) {
+  const username = adminUsername();
+  const existing = db
+    .prepare("SELECT id FROM users WHERE username = ?")
+    .get(username);
+  if (existing) {
+    db.prepare(
+      "UPDATE users SET role = 'admin', status = 'active' WHERE username = ?"
+    ).run(username);
+    return;
+  }
+  db.prepare(
+    "INSERT INTO users (username, password_hash, role, status) VALUES (?, ?, 'admin', 'active')"
+  ).run(username, hashPassword(adminPassword()));
+}
+
+// Seed the demo agents referenced by the sample leads (password "changeme")
+// so lead assignments line up with real logins. Only runs on an empty table.
+function seedAgentsIfEmpty(db: Database.Database) {
   const count = db.prepare("SELECT COUNT(*) AS n FROM users").get() as {
     n: number;
   };
   if (count.n > 0) return;
 
   const insert = db.prepare(
-    "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)"
+    "INSERT INTO users (username, password_hash, role, status) VALUES (?, ?, 'agent', 'active')"
   );
-  const username = process.env.ADMIN_USERNAME || "admin";
-  const password = process.env.ADMIN_PASSWORD || "admin";
-  insert.run(username, hashPassword(password), "admin");
-
   for (const agent of ["Dana", "Miguel", "Priya"]) {
-    if (agent === username) continue;
-    insert.run(agent, hashPassword("changeme"), "agent");
+    insert.run(agent, hashPassword("changeme"));
   }
 }
 

@@ -28,22 +28,37 @@ slice you're looking at.
 
 ## Authentication
 
-The app requires login. On first run a single user is seeded:
+The app requires login. There is **no open sign-up** — instead, people request
+access and an **admin approves** them (see below). A bootstrap admin is created
+automatically and is guaranteed to exist on every start (so you can't be locked
+out):
 
-| Variable         | Default | Purpose                          |
-| ---------------- | ------- | -------------------------------- |
-| `ADMIN_USERNAME` | `admin` | Seed user's username             |
-| `ADMIN_PASSWORD` | `admin` | Seed user's password             |
-| `AUTH_SECRET`    | dev key | HMAC secret used to sign sessions|
+| Variable         | Default                  | Purpose                           |
+| ---------------- | ------------------------ | --------------------------------- |
+| `ADMIN_USERNAME` | `bernard@teamcerium.com` | The admin account's username      |
+| `ADMIN_PASSWORD` | `changeme`               | The admin's initial password      |
+| `AUTH_SECRET`    | dev key                  | HMAC secret used to sign sessions |
 
-**Before deploying**, set a strong `AUTH_SECRET` and your own admin
-credentials, e.g. in a `.env.local` file:
+Default admin: **`bernard@teamcerium.com` / `changeme`** — sign in and change the
+password immediately (Settings → Your account). **Before deploying**, set a
+strong `AUTH_SECRET` (and optionally override the admin) in `.env.local`:
 
 ```
 AUTH_SECRET=some-long-random-string
-ADMIN_USERNAME=you@example.com
+ADMIN_USERNAME=bernard@teamcerium.com
 ADMIN_PASSWORD=a-strong-password
 ```
+
+### Sign-up & approval
+
+1. A new person opens **/signup** (linked from the login page) and requests an
+   account with their email + a password.
+2. The account is created as **pending** — they can't log in yet.
+3. An admin opens **Settings → Pending approvals** and clicks **Approve**
+   (or **Reject**). Approved users can now sign in as agents.
+
+Approval is enforced server-side: pending accounts are refused at login, and the
+approve endpoint is admin-only.
 
 Sessions are stateless signed cookies (HMAC-SHA256, 7-day expiry); passwords are
 hashed with scrypt. The seed user is only created when the `users` table is
