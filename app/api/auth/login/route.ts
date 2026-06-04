@@ -7,14 +7,14 @@ export const dynamic = "force-dynamic";
 
 // POST /api/auth/login  body: { username, password }
 export async function POST(req: NextRequest) {
-  const db = getDb();
+  const db = await getDb();
   const body = await req.json().catch(() => ({}));
   const username = String(body.username ?? "").trim();
   const password = String(body.password ?? "");
 
-  const user = db
+  const user = (await db
     .prepare("SELECT * FROM users WHERE username = ?")
-    .get(username) as
+    .get(username)) as
     | { username: string; password_hash: string; role: string; status: string }
     | undefined;
 

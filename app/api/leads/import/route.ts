@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { parseCsv } from "@/lib/csv";
 import { STATUSES, Status } from "@/lib/types";
+import type { InValue } from "@libsql/client";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ function normalizeStatus(raw: string): Status {
 // POST /api/leads/import  body: { csv: string }
 // Each non-empty row with a name becomes a new lead. Returns counts.
 export async function POST(req: NextRequest) {
-  const db = getDb();
+  const db = await getDb();
   const body = await req.json().catch(() => ({}));
   const csv = String(body.csv ?? "");
   if (!csv.trim()) {
@@ -59,30 +60,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not parse CSV." }, { status: 400 });
   }
 
-  const insert = db.prepare(`
+  const insertSql = `
     INSERT INTO leads (name, email, phone, company, source, status, spend, value, assigned_agent, notes)
     VALUES (@name, @email, @phone, @company, @source, @status, @spend, @value, @assigned_agent, @notes)
-  `);
+  `;
 
-  let imported = 0;
   let skipped = 0;
+  const inserts: { sql: string; args: Record<string, InValue> }[] = [];
 
-  const run = db.transaction((rows: Record<string, string>[]) => {
-    for (const raw of rows) {
-      // Remap headers through the alias table.
-      const r: Record<string, string> = {};
-      for (const [key, val] of Object.entries(raw)) {
-        const canonical = ALIASES[key];
-        if (canonical) r[canonical] = val;
-      }
+  for (const raw of records) {
+    // Remap headers through the alias table.
+    const r: Record<string, string> = {};
+    for (const [key, val] of Object.entries(raw)) {
+      const canonical = ALIASES[key];
+      if (canonical) r[canonical] = val;
+    }
 
-      const name = (r.name ?? "").trim();
-      if (!name) {
-        skipped++;
-        continue;
-      }
+    const name = (r.name ?? "").trim();
+    if (!name) {
+      skipped++;
+      continue;
+    }
 
-      insert.run({
+    inserts.push({
+      sql: insertSql,
+      args: {
         name,
         email: r.email ?? "",
         phone: r.phone ?? "",
@@ -93,12 +95,12 @@ export async function POST(req: NextRequest) {
         value: Number(String(r.value ?? "").replace(/[$,]/g, "")) || 0,
         assigned_agent: r.assigned_agent ?? "",
         notes: r.notes ?? "",
-      });
-      imported++;
-    }
-  });
+      },
+    });
+  }
 
-  run(records);
+  // Insert every row atomically (all-or-nothing), matching the old transaction.
+  if (inserts.length) await db.batch(inserts);
 
-  return NextResponse.json({ imported, skipped });
+  return NextResponse.json({ imported: inserts.length, skipped });
 }

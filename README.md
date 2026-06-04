@@ -1,8 +1,10 @@
 # Lead CRM
 
-A simple, self-contained CRM web app for managing sales leads. Built with
-**Next.js** (App Router) and a local **SQLite** database — no external services
-to configure.
+A simple CRM web app for managing sales leads. Built with **Next.js** (App
+Router) and a **libSQL/SQLite** database. It runs against a **local SQLite file**
+out of the box (no setup), and points at a **hosted database** in production by
+setting two environment variables — so it deploys cleanly to serverless hosts
+like Vercel. See [Hosted database](#hosted-database).
 
 ## What it does
 
@@ -94,6 +96,46 @@ them on the Settings page (or set your own before first run). CSV import still
 accepts free-text agent names; if an imported name isn't a user it's preserved
 and shown as "(not a user)" in the edit dropdown until you reassign it.
 
+## Hosted database
+
+The app talks to a **libSQL** database (SQLite's dialect, but it can live
+remotely). This matters for serverless hosting (Vercel, Netlify, etc.), where
+the local filesystem is **ephemeral** — a local `.db` file would be wiped on
+every deploy and cold start. A hosted database persists your leads independently
+of the app servers.
+
+**Local development** needs nothing: with no env vars set, the app uses a local
+file at `data/crm.db` (created and seeded automatically).
+
+**Production** uses a hosted libSQL database. The easiest is a free
+[Turso](https://turso.tech) database:
+
+1. Create a database and grab its URL + auth token. With the Turso CLI:
+
+   ```bash
+   turso db create lead-crm
+   turso db show lead-crm --url          # -> libsql://lead-crm-<org>.turso.io
+   turso db tokens create lead-crm       # -> the auth token
+   ```
+
+   (Or create one from the Turso dashboard — same two values.)
+
+2. Set these environment variables on your host (e.g. Vercel → Project →
+   Settings → Environment Variables), and in `.env.local` for local testing:
+
+   | Variable             | Example                              | Purpose                  |
+   | -------------------- | ------------------------------------ | ------------------------ |
+   | `TURSO_DATABASE_URL` | `libsql://lead-crm-acme.turso.io`    | The hosted database URL  |
+   | `TURSO_AUTH_TOKEN`   | `eyJhbGciOi...`                      | Its auth token           |
+
+That's it — the schema is created and seeded automatically on first connection,
+exactly like the local file. Any libSQL-compatible URL works; if your provider
+uses a different variable name, `DATABASE_URL` is also accepted as a fallback.
+
+> Any hosted SQLite/libSQL service works. Turso is just the free,
+> zero-config default. The same `data/crm.db` fallback keeps `npm run dev` and CI
+> running with no external service.
+
 ## Continuous integration
 
 Every push and pull request runs **lint + build** via GitHub Actions
@@ -146,7 +188,7 @@ app/
   analytics/        # conversion & spend dashboard
   api/              # REST endpoints backed by SQLite
 lib/
-  db.ts             # SQLite connection, schema, seed data
+  db.ts             # libSQL/SQLite connection, schema, seed data
   types.ts          # shared types + the status funnel
   format.ts         # money / percent / date helpers
 data/

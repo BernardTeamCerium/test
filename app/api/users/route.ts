@@ -6,9 +6,9 @@ import { requireAdmin } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 // GET /api/users -> list of users (for assignment dropdowns and the settings page).
-export function GET() {
-  const db = getDb();
-  const users = db
+export async function GET() {
+  const db = await getDb();
+  const users = await db
     .prepare(
       "SELECT id, username, role, status, created_at FROM users ORDER BY username COLLATE NOCASE"
     )
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const gate = await requireAdmin();
   if (gate instanceof NextResponse) return gate;
 
-  const db = getDb();
+  const db = await getDb();
   const body = await req.json().catch(() => ({}));
   const username = String(body.username ?? "").trim();
   const password = String(body.password ?? "");
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  const exists = db
+  const exists = await db
     .prepare("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE")
     .get(username);
   if (exists) {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const info = db
+  const info = await db
     .prepare(
       "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)"
     )

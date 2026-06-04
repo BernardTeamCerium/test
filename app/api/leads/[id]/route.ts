@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, type Db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { STATUSES } from "@/lib/types";
 
@@ -16,13 +16,13 @@ interface TimelineItem {
 }
 
 // Merge logged calls and recorded activities into one reverse-chronological feed.
-function buildTimeline(db: ReturnType<typeof getDb>, leadId: string) {
-  const calls = db
+async function buildTimeline(db: Db, leadId: string) {
+  const calls = (await db
     .prepare("SELECT * FROM call_logs WHERE lead_id = ?")
-    .all(leadId) as any[];
-  const activities = db
+    .all(leadId)) as any[];
+  const activities = (await db
     .prepare("SELECT * FROM activities WHERE lead_id = ?")
-    .all(leadId) as any[];
+    .all(leadId)) as any[];
 
   const items: TimelineItem[] = [
     ...calls.map((c) => ({
@@ -53,25 +53,27 @@ function buildTimeline(db: ReturnType<typeof getDb>, leadId: string) {
 }
 
 // GET /api/leads/:id  -> a single lead, its call history, and a merged timeline
-export function GET(_req: NextRequest, { params }: Params) {
-  const db = getDb();
-  const lead = db.prepare("SELECT * FROM leads WHERE id = ?").get(params.id);
+export async function GET(_req: NextRequest, { params }: Params) {
+  const db = await getDb();
+  const lead = await db
+    .prepare("SELECT * FROM leads WHERE id = ?")
+    .get(params.id);
   if (!lead) {
     return NextResponse.json({ error: "Lead not found." }, { status: 404 });
   }
-  const calls = db
+  const calls = await db
     .prepare(
       "SELECT * FROM call_logs WHERE lead_id = ? ORDER BY datetime(created_at) DESC, id DESC"
     )
     .all(params.id);
-  const timeline = buildTimeline(db, params.id);
+  const timeline = await buildTimeline(db, params.id);
   return NextResponse.json({ ...lead, calls, timeline });
 }
 
 // PATCH /api/leads/:id  -> update any subset of editable fields
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const db = getDb();
-  const existing = db
+  const db = await getDb();
+  const existing = await db
     .prepare("SELECT * FROM leads WHERE id = ?")
     .get(params.id);
   if (!existing) {
@@ -106,9 +108,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   sets.push("updated_at = datetime('now')");
-  db.prepare(`UPDATE leads SET ${sets.join(", ")} WHERE id = @id`).run(
-    updateParams
-  );
+  await db
+    .prepare(`UPDATE leads SET ${sets.join(", ")} WHERE id = @id`)
+    .run(updateParams);
 
   // Record what changed on the lead's timeline.
   const prev = existing as any;
@@ -117,7 +119,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     "status" in updateParams &&
     updateParams.status !== prev.status
   ) {
-    logActivity(
+    await logActivity(
       db,
       params.id,
       "status",
@@ -129,19 +131,30 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     (k) => k !== "id" && k !== "status" && updateParams[k] !== prev[k]
   );
   if (nonStatusChanged) {
-    logActivity(db, params.id, "edited", "Lead details updated", actor);
+    await logActivity(db, params.id, "edited", "Lead details updated", actor);
   }
 
-  const lead = db.prepare("SELECT * FROM leads WHERE id = ?").get(params.id);
+  const lead = await db
+    .prepare("SELECT * FROM leads WHERE id = ?")
+    .get(params.id);
   return NextResponse.json(lead);
 }
 
 // DELETE /api/leads/:id
-export function DELETE(_req: NextRequest, { params }: Params) {
-  const db = getDb();
-  const info = db.prepare("DELETE FROM leads WHERE id = ?").run(params.id);
-  if (info.changes === 0) {
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const db = await getDb();
+  const existing = await db
+    .prepare("SELECT id FROM leads WHERE id = ?")
+    .get(params.id);
+  if (!existing) {
     return NextResponse.json({ error: "Lead not found." }, { status: 404 });
   }
+  // Delete child rows explicitly so removal works regardless of whether the
+  // hosted database enforces ON DELETE CASCADE for this connection.
+  await db.batch([
+    { sql: "DELETE FROM call_logs WHERE lead_id = ?", args: [params.id] },
+    { sql: "DELETE FROM activities WHERE lead_id = ?", args: [params.id] },
+    { sql: "DELETE FROM leads WHERE id = ?", args: [params.id] },
+  ]);
   return NextResponse.json({ ok: true });
 }

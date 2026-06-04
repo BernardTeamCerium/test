@@ -10,18 +10,22 @@ type Params = { params: { id: string } };
 // POST /api/leads/:id/calls  -> log a call outcome, optionally updating the
 // lead's status in the same step (the common agent workflow).
 export async function POST(req: NextRequest, { params }: Params) {
-  const db = getDb();
-  const lead = db.prepare("SELECT * FROM leads WHERE id = ?").get(params.id);
+  const db = await getDb();
+  const lead = await db
+    .prepare("SELECT * FROM leads WHERE id = ?")
+    .get(params.id);
   if (!lead) {
     return NextResponse.json({ error: "Lead not found." }, { status: 404 });
   }
 
   const body = await req.json().catch(() => ({}));
 
-  db.prepare(
-    `INSERT INTO call_logs (lead_id, agent, outcome, note)
+  await db
+    .prepare(
+      `INSERT INTO call_logs (lead_id, agent, outcome, note)
      VALUES (@lead_id, @agent, @outcome, @note)`
-  ).run({
+    )
+    .run({
     lead_id: params.id,
     agent: String(body.agent ?? "").trim(),
     outcome: String(body.outcome ?? "").trim(),
@@ -34,28 +38,34 @@ export async function POST(req: NextRequest, { params }: Params) {
     STATUSES.includes(body.status) &&
     body.status !== (lead as any).status
   ) {
-    logActivity(
+    await logActivity(
       db,
       params.id,
       "status",
       `${(lead as any).status} → ${body.status}`,
       String(body.agent ?? "").trim()
     );
-    db.prepare(
-      "UPDATE leads SET status = ?, updated_at = datetime('now') WHERE id = ?"
-    ).run(body.status, params.id);
+    await db
+      .prepare(
+        "UPDATE leads SET status = ?, updated_at = datetime('now') WHERE id = ?"
+      )
+      .run(body.status, params.id);
   } else if (body.status && STATUSES.includes(body.status)) {
-    db.prepare(
-      "UPDATE leads SET status = ?, updated_at = datetime('now') WHERE id = ?"
-    ).run(body.status, params.id);
+    await db
+      .prepare(
+        "UPDATE leads SET status = ?, updated_at = datetime('now') WHERE id = ?"
+      )
+      .run(body.status, params.id);
   } else {
-    db.prepare(
-      "UPDATE leads SET updated_at = datetime('now') WHERE id = ?"
-    ).run(params.id);
+    await db
+      .prepare("UPDATE leads SET updated_at = datetime('now') WHERE id = ?")
+      .run(params.id);
   }
 
-  const updated = db.prepare("SELECT * FROM leads WHERE id = ?").get(params.id);
-  const calls = db
+  const updated = await db
+    .prepare("SELECT * FROM leads WHERE id = ?")
+    .get(params.id);
+  const calls = await db
     .prepare(
       "SELECT * FROM call_logs WHERE lead_id = ? ORDER BY datetime(created_at) DESC, id DESC"
     )

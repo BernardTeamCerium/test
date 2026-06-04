@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const gate = await requireAdmin();
   if (gate instanceof NextResponse) return gate;
 
-  const db = getDb();
+  const db = await getDb();
   const body = await req.json().catch(() => ({}));
   const password = String(body.password ?? "");
   if (password.length < 4) {
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
   }
 
-  const info = db
+  const info = await db
     .prepare("UPDATE users SET password_hash = ? WHERE id = ?")
     .run(hashPassword(password), params.id);
   if (info.changes === 0) {

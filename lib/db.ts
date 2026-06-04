@@ -1,26 +1,140 @@
-import Database from "better-sqlite3";
-import path from "path";
+import { createClient, type Client, type InValue } from "@libsql/client";
 import fs from "fs";
 import { hashPassword } from "./password";
 
-// Store the SQLite file under ./data so it persists between runs but stays
-// out of version control (see .gitignore).
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "crm.db");
-
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// ---------------------------------------------------------------------------
+// Hosted database connection (libSQL / Turso).
+//
+// This app talks to a libSQL database, which speaks SQLite's dialect but can be
+// hosted remotely — so it works on serverless platforms (Vercel, etc.) where
+// the local filesystem is ephemeral and a local SQLite file would be wiped on
+// every deploy/cold start.
+//
+// Configure with environment variables:
+//   TURSO_DATABASE_URL  - libsql://<your-db>.turso.io  (the hosted database)
+//   TURSO_AUTH_TOKEN    - the database auth token
+//
+// With neither set, it falls back to a local file (file:data/crm.db) so
+// `npm run dev` still works out of the box with no external services.
+// See README "Hosted database" for how to create a free Turso database.
+// ---------------------------------------------------------------------------
+function dbUrl(): string {
+  return (
+    process.env.TURSO_DATABASE_URL ||
+    process.env.DATABASE_URL ||
+    "file:data/crm.db"
+  );
 }
 
-// Reuse a single connection across hot reloads in development.
-const globalForDb = globalThis as unknown as { _crmDb?: Database.Database };
+function authToken(): string | undefined {
+  return process.env.TURSO_AUTH_TOKEN || undefined;
+}
 
-function createDb(): Database.Database {
-  const db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
+type Row = Record<string, any>;
 
-  db.exec(`
+// Positional params arrive as a list of scalars (`?` placeholders); named
+// params arrive as a single object (`@name` placeholders), matching how
+// better-sqlite3 was called throughout the app.
+function toArgs(args: unknown[]): InValue[] | Record<string, InValue> {
+  if (
+    args.length === 1 &&
+    args[0] !== null &&
+    typeof args[0] === "object" &&
+    !Array.isArray(args[0])
+  ) {
+    return args[0] as Record<string, InValue>;
+  }
+  return args as InValue[];
+}
+
+export interface Stmt {
+  get<T = Row>(...args: unknown[]): Promise<T | undefined>;
+  all<T = Row>(...args: unknown[]): Promise<T[]>;
+  run(
+    ...args: unknown[]
+  ): Promise<{ changes: number; lastInsertRowid: number }>;
+}
+
+export interface Db {
+  prepare(sql: string): Stmt;
+  exec(sql: string): Promise<void>;
+  // Run several statements atomically (the async stand-in for the synchronous
+  // db.transaction() used by import/seed).
+  batch(
+    statements: { sql: string; args?: InValue[] | Record<string, InValue> }[]
+  ): Promise<void>;
+  client: Client;
+}
+
+// A thin async wrapper exposing the slice of the better-sqlite3 surface the app
+// uses (prepare().get/all/run), backed by the hosted libSQL client.
+function wrap(client: Client): Db {
+  return {
+    client,
+    prepare(sql: string): Stmt {
+      return {
+        async all<T = Row>(...args: unknown[]) {
+          const rs = await client.execute({ sql, args: toArgs(args) });
+          return rs.rows as unknown as T[];
+        },
+        async get<T = Row>(...args: unknown[]) {
+          const rs = await client.execute({ sql, args: toArgs(args) });
+          return (rs.rows[0] as unknown as T) ?? undefined;
+        },
+        async run(...args: unknown[]) {
+          const rs = await client.execute({ sql, args: toArgs(args) });
+          return {
+            changes: rs.rowsAffected,
+            lastInsertRowid:
+              rs.lastInsertRowid != null ? Number(rs.lastInsertRowid) : 0,
+          };
+        },
+      };
+    },
+    async exec(sql: string) {
+      await client.executeMultiple(sql);
+    },
+    async batch(statements) {
+      await client.batch(
+        statements.map((s) => ({ sql: s.sql, args: s.args ?? [] })),
+        "write"
+      );
+    },
+  };
+}
+
+// Memoize the (async) connection + schema setup so it runs exactly once and is
+// reused across requests and dev hot-reloads.
+const globalForDb = globalThis as unknown as { _crmDb?: Promise<Db> };
+
+export function getDb(): Promise<Db> {
+  if (!globalForDb._crmDb) {
+    globalForDb._crmDb = init();
+  }
+  return globalForDb._crmDb;
+}
+
+async function init(): Promise<Db> {
+  const url = dbUrl();
+  // For the local-file fallback (file:<path>), make sure the directory exists —
+  // libSQL won't create it. Remote (libsql://) URLs skip this entirely.
+  const fileMatch = /^file:(.*)$/.exec(url);
+  if (fileMatch) {
+    const dir = fileMatch[1].replace(/^\/\//, "").split("/").slice(0, -1).join("/");
+    if (dir) fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const db = wrap(createClient({ url, authToken: authToken() }));
+  await createSchema(db);
+  await migrate(db);
+  await seedIfEmpty(db);
+  await seedAgentsIfEmpty(db);
+  await ensureAdmin(db);
+  return db;
+}
+
+async function createSchema(db: Db) {
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS leads (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       name           TEXT    NOT NULL,
@@ -43,7 +157,6 @@ function createDb(): Database.Database {
       agent      TEXT    NOT NULL DEFAULT '',
       outcome    TEXT    NOT NULL DEFAULT '',
       note       TEXT    NOT NULL DEFAULT '',
-      -- Millisecond precision so the activity timeline orders same-second events.
       created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now'))
     );
 
@@ -52,7 +165,7 @@ function createDb(): Database.Database {
     CREATE TABLE IF NOT EXISTS activities (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       lead_id    INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
-      type       TEXT    NOT NULL,            -- created | status | edited
+      type       TEXT    NOT NULL,
       detail     TEXT    NOT NULL DEFAULT '',
       actor      TEXT    NOT NULL DEFAULT '',
       created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now'))
@@ -64,17 +177,11 @@ function createDb(): Database.Database {
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       username      TEXT    NOT NULL UNIQUE,
       password_hash TEXT    NOT NULL,
-      role          TEXT    NOT NULL DEFAULT 'agent',   -- 'admin' | 'agent'
-      status        TEXT    NOT NULL DEFAULT 'active',  -- 'active' | 'pending'
+      role          TEXT    NOT NULL DEFAULT 'agent',
+      status        TEXT    NOT NULL DEFAULT 'active',
       created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
     );
   `);
-
-  migrate(db);
-  seedIfEmpty(db);
-  seedAgentsIfEmpty(db);
-  ensureAdmin(db);
-  return db;
 }
 
 // The bootstrap admin account. Override with env vars; defaults to the project
@@ -87,21 +194,23 @@ function adminPassword() {
 }
 
 // Lightweight migrations for databases created before a column existed.
-function migrate(db: Database.Database) {
-  const cols = db.prepare("PRAGMA table_info(users)").all() as {
-    name: string;
-  }[];
+async function migrate(db: Db) {
+  const cols = (await db
+    .prepare("PRAGMA table_info(users)")
+    .all()) as { name: string }[];
   const has = (name: string) => cols.some((c) => c.name === name);
 
   if (!has("role")) {
-    db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'agent'");
-    db.prepare("UPDATE users SET role = 'admin' WHERE username = ?").run(
-      adminUsername()
+    await db.exec(
+      "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'agent'"
     );
+    await db
+      .prepare("UPDATE users SET role = 'admin' WHERE username = ?")
+      .run(adminUsername());
   }
   if (!has("status")) {
     // Existing accounts predate approval, so treat them all as active.
-    db.exec(
+    await db.exec(
       "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
     );
   }
@@ -110,48 +219,47 @@ function migrate(db: Database.Database) {
 // Guarantee the configured admin always exists as an active admin, so you can
 // never be locked out (works on fresh and existing databases alike). If the
 // account already exists, its password is left untouched.
-function ensureAdmin(db: Database.Database) {
+async function ensureAdmin(db: Db) {
   const username = adminUsername();
-  const existing = db
+  const existing = await db
     .prepare("SELECT id FROM users WHERE username = ?")
     .get(username);
   if (existing) {
-    db.prepare(
-      "UPDATE users SET role = 'admin', status = 'active' WHERE username = ?"
-    ).run(username);
+    await db
+      .prepare(
+        "UPDATE users SET role = 'admin', status = 'active' WHERE username = ?"
+      )
+      .run(username);
     return;
   }
-  db.prepare(
-    "INSERT INTO users (username, password_hash, role, status) VALUES (?, ?, 'admin', 'active')"
-  ).run(username, hashPassword(adminPassword()));
+  await db
+    .prepare(
+      "INSERT INTO users (username, password_hash, role, status) VALUES (?, ?, 'admin', 'active')"
+    )
+    .run(username, hashPassword(adminPassword()));
 }
 
 // Seed the demo agents referenced by the sample leads (password "changeme")
 // so lead assignments line up with real logins. Only runs on an empty table.
-function seedAgentsIfEmpty(db: Database.Database) {
-  const count = db.prepare("SELECT COUNT(*) AS n FROM users").get() as {
-    n: number;
-  };
+async function seedAgentsIfEmpty(db: Db) {
+  const count = (await db
+    .prepare("SELECT COUNT(*) AS n FROM users")
+    .get()) as { n: number };
   if (count.n > 0) return;
 
-  const insert = db.prepare(
-    "INSERT INTO users (username, password_hash, role, status) VALUES (?, ?, 'agent', 'active')"
+  await db.batch(
+    ["Dana", "Miguel", "Priya"].map((agent) => ({
+      sql: "INSERT INTO users (username, password_hash, role, status) VALUES (?, ?, 'agent', 'active')",
+      args: [agent, hashPassword("changeme")],
+    }))
   );
-  for (const agent of ["Dana", "Miguel", "Priya"]) {
-    insert.run(agent, hashPassword("changeme"));
-  }
 }
 
-function seedIfEmpty(db: Database.Database) {
-  const count = db.prepare("SELECT COUNT(*) AS n FROM leads").get() as {
-    n: number;
-  };
+async function seedIfEmpty(db: Db) {
+  const count = (await db
+    .prepare("SELECT COUNT(*) AS n FROM leads")
+    .get()) as { n: number };
   if (count.n > 0) return;
-
-  const insert = db.prepare(`
-    INSERT INTO leads (name, email, phone, company, source, status, spend, value, assigned_agent, notes)
-    VALUES (@name, @email, @phone, @company, @source, @status, @spend, @value, @assigned_agent, @notes)
-  `);
 
   const sample = [
     { name: "Amara Johnson", email: "amara.j@example.com", phone: "+1-555-0101", company: "Brightside Realty", source: "Facebook Ads", status: "New", spend: 42.5, value: 0, assigned_agent: "Dana", notes: "Downloaded pricing guide." },
@@ -164,15 +272,14 @@ function seedIfEmpty(db: Database.Database) {
     { name: "Ibrahim Saleh", email: "ibrahim.s@example.com", phone: "+1-555-0108", company: "Saleh Imports", source: "Google Ads", status: "New", spend: 71.4, value: 0, assigned_agent: "", notes: "" },
   ];
 
-  const seed = db.transaction((rows: typeof sample) => {
-    for (const r of rows) insert.run(r);
-  });
-  seed(sample);
-}
-
-export function getDb(): Database.Database {
-  if (!globalForDb._crmDb) {
-    globalForDb._crmDb = createDb();
-  }
-  return globalForDb._crmDb;
+  await db.batch(
+    sample.map((r) => ({
+      sql: `INSERT INTO leads (name, email, phone, company, source, status, spend, value, assigned_agent, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        r.name, r.email, r.phone, r.company, r.source, r.status,
+        r.spend, r.value, r.assigned_agent, r.notes,
+      ],
+    }))
+  );
 }

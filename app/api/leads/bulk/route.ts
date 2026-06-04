@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // POST /api/leads/bulk  body: { ids: number[], action: "status"|"assign"|"delete", value?: string }
 // Applies one action to many leads in a single transaction.
 export async function POST(req: NextRequest) {
-  const db = getDb();
+  const db = await getDb();
   const body = await req.json().catch(() => ({}));
 
   const ids = Array.isArray(body.ids)
@@ -24,7 +24,13 @@ export async function POST(req: NextRequest) {
   let affected = 0;
 
   if (action === "delete") {
-    const info = db
+    // Remove child rows first so deletion works regardless of whether the
+    // hosted database enforces ON DELETE CASCADE for this connection.
+    await db.batch([
+      { sql: `DELETE FROM call_logs WHERE lead_id IN (${placeholders})`, args: ids },
+      { sql: `DELETE FROM activities WHERE lead_id IN (${placeholders})`, args: ids },
+    ]);
+    const info = await db
       .prepare(`DELETE FROM leads WHERE id IN (${placeholders})`)
       .run(...ids);
     affected = info.changes;
@@ -33,18 +39,18 @@ export async function POST(req: NextRequest) {
     if (!STATUSES.includes(status as any)) {
       return NextResponse.json({ error: "Invalid status." }, { status: 400 });
     }
-    const info = db
+    const info = await db
       .prepare(
         `UPDATE leads SET status = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`
       )
       .run(status, ...ids);
     affected = info.changes;
     for (const id of ids) {
-      logActivity(db, id, "status", `Status set to ${status} (bulk)`);
+      await logActivity(db, id, "status", `Status set to ${status} (bulk)`);
     }
   } else if (action === "assign") {
     const agent = String(body.value ?? "").trim();
-    const info = db
+    const info = await db
       .prepare(
         `UPDATE leads SET assigned_agent = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`
       )
