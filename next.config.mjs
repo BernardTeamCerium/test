@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    // better-sqlite3 is a native module; keep it external so Next doesn't bundle it.
-    serverComponentsExternalPackages: ["better-sqlite3"],
+    // libSQL ships a native addon; keep it (and its client) external so Next
+    // doesn't try to bundle it.
+    serverComponentsExternalPackages: ["@libsql/client", "libsql"],
   },
 };
 

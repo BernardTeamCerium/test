@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = getDb();
+  const db = await getDb();
   const body = await req.json().catch(() => ({}));
   const currentPassword = String(body.currentPassword ?? "");
   const newPassword = String(body.newPassword ?? "");
@@ -25,9 +25,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const user = db
+  const user = (await db
     .prepare("SELECT * FROM users WHERE username = ?")
-    .get(session.username) as { id: number; password_hash: string } | undefined;
+    .get(session.username)) as
+    | { id: number; password_hash: string }
+    | undefined;
   if (!user || !verifyPassword(currentPassword, user.password_hash)) {
     return NextResponse.json(
       { error: "Current password is incorrect." },
@@ -35,9 +37,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(
-    hashPassword(newPassword),
-    user.id
-  );
+  await db
+    .prepare("UPDATE users SET password_hash = ? WHERE id = ?")
+    .run(hashPassword(newPassword), user.id);
   return NextResponse.json({ ok: true });
 }

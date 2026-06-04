@@ -11,8 +11,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const gate = await requireAdmin();
   if (gate instanceof NextResponse) return gate;
 
-  const db = getDb();
-  const info = db
+  const db = await getDb();
+  const info = await db
     .prepare("UPDATE users SET status = 'active' WHERE id = ?")
     .run(params.id);
   if (info.changes === 0) {

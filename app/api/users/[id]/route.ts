@@ -14,10 +14,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const gate = await requireAdmin();
   if (gate instanceof NextResponse) return gate;
 
-  const db = getDb();
-  const count = db.prepare("SELECT COUNT(*) AS n FROM users").get() as {
-    n: number;
-  };
+  const db = await getDb();
+  const count = (await db
+    .prepare("SELECT COUNT(*) AS n FROM users")
+    .get()) as { n: number };
   if (count.n <= 1) {
     return NextResponse.json(
       { error: "Cannot delete the last remaining user." },
@@ -25,9 +25,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     );
   }
 
-  const user = db
+  const user = (await db
     .prepare("SELECT * FROM users WHERE id = ?")
-    .get(params.id) as { username: string } | undefined;
+    .get(params.id)) as { username: string } | undefined;
   if (!user) {
     return NextResponse.json({ error: "User not found." }, { status: 404 });
   }
@@ -36,19 +36,21 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const { searchParams } = new URL(req.url);
   let reassignTo = (searchParams.get("reassignTo") || "").trim();
   if (reassignTo) {
-    const target = db
+    const target = await db
       .prepare("SELECT 1 FROM users WHERE username = ?")
       .get(reassignTo);
     if (!target) reassignTo = "";
   }
 
-  const reassigned = db
-    .prepare(
-      "UPDATE leads SET assigned_agent = ?, updated_at = datetime('now') WHERE assigned_agent = ?"
-    )
-    .run(reassignTo, user.username).changes;
+  const reassigned = (
+    await db
+      .prepare(
+        "UPDATE leads SET assigned_agent = ?, updated_at = datetime('now') WHERE assigned_agent = ?"
+      )
+      .run(reassignTo, user.username)
+  ).changes;
 
-  db.prepare("DELETE FROM users WHERE id = ?").run(params.id);
+  await db.prepare("DELETE FROM users WHERE id = ?").run(params.id);
 
   return NextResponse.json({
     ok: true,

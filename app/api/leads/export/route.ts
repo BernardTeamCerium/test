@@ -24,7 +24,7 @@ const COLUMNS: (keyof Lead)[] = [
 // GET /api/leads/export?status=&q=&agent=&mine=1 -> CSV download of leads
 // matching the same filters as the Leads page (open in Google Sheets / Excel).
 export async function GET(req: NextRequest) {
-  const db = getDb();
+  const db = await getDb();
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
   const q = searchParams.get("q");
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     "SELECT * FROM leads" +
     (where.length ? " WHERE " + where.join(" AND ") : "") +
     " ORDER BY datetime(created_at) DESC, id DESC";
-  const leads = db.prepare(sql).all(params) as Lead[];
+  const leads = (await db.prepare(sql).all(params)) as Lead[];
 
   const rows = leads.map((l) => COLUMNS.map((c) => l[c] as string | number));
   const csv = toCsv(COLUMNS as string[], rows);
