@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { money, percent } from "@/lib/format";
+import { useCallback, useEffect, useState } from "react";
+import { money, percent, dateTime } from "@/lib/format";
+import { SOURCES, type AdSpend } from "@/lib/types";
 
 interface SourceRow {
   source: string;
@@ -19,7 +20,6 @@ interface AgentRow {
   leads: number;
   converted: number;
   conversionRate: number;
-  spend: number;
   value: number;
   calls: number;
 }
@@ -52,6 +52,12 @@ function isoDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+const emptySpendForm = {
+  source: SOURCES[0] as string,
+  amount: "",
+  spend_date: isoDaysAgo(0),
+};
+
 export default function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,27 +65,99 @@ export default function AnalyticsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  // Derive the effective range from the chosen preset (custom uses the inputs).
-  function rangeFor(p: string): { from: string; to: string } {
-    if (p === "all") return { from: "", to: "" };
-    if (p === "custom") return { from, to };
-    return { from: isoDaysAgo(Number(p)), to: isoDaysAgo(0) };
-  }
+  // Admin-only ad-spend management.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adSpend, setAdSpend] = useState<AdSpend[]>([]);
+  const [spendForm, setSpendForm] = useState(emptySpendForm);
+  const [savingSpend, setSavingSpend] = useState(false);
+  const [spendError, setSpendError] = useState("");
 
-  useEffect(() => {
+  // Derive the effective range from the chosen preset (custom uses the inputs).
+  const rangeFor = useCallback(
+    (p: string): { from: string; to: string } => {
+      if (p === "all") return { from: "", to: "" };
+      if (p === "custom") return { from, to };
+      return { from: isoDaysAgo(Number(p)), to: isoDaysAgo(0) };
+    },
+    [from, to]
+  );
+
+  // Build the from/to query string for the current range.
+  const rangeParams = useCallback(() => {
     const r = rangeFor(preset);
     const qs = new URLSearchParams();
     if (r.from) qs.set("from", r.from);
     if (r.to) qs.set("to", r.to);
+    return qs;
+  }, [rangeFor, preset]);
+
+  const loadAnalytics = useCallback(() => {
     setLoading(true);
-    fetch(`/api/analytics?${qs.toString()}`)
+    fetch(`/api/analytics?${rangeParams().toString()}`)
       .then((res) => res.json())
       .then((d) => {
         setData(d);
         setLoading(false);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset, from, to]);
+  }, [rangeParams]);
+
+  const loadAdSpend = useCallback(() => {
+    fetch(`/api/ad-spend?${rangeParams().toString()}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((d) => setAdSpend(Array.isArray(d) ? d : []))
+      .catch(() => setAdSpend([]));
+  }, [rangeParams]);
+
+  // Resolve the current user's role once (controls the ad-spend editor).
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setIsAdmin(d?.role === "admin"))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadAnalytics();
+    loadAdSpend();
+  }, [loadAnalytics, loadAdSpend]);
+
+  async function addSpend(e: React.FormEvent) {
+    e.preventDefault();
+    setSpendError("");
+    const amount = Number(spendForm.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      setSpendError("Enter a valid non-negative amount.");
+      return;
+    }
+    setSavingSpend(true);
+    const res = await fetch("/api/ad-spend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...spendForm, amount }),
+    });
+    setSavingSpend(false);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setSpendError(d.error || "Could not save ad spend.");
+      return;
+    }
+    setSpendForm((f) => ({ ...f, amount: "" }));
+    loadAdSpend();
+    loadAnalytics();
+  }
+
+  async function deleteSpend(id: number) {
+    if (!confirm("Delete this ad-spend entry?")) return;
+    const res = await fetch(`/api/ad-spend/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      loadAdSpend();
+      loadAnalytics();
+    }
+  }
+
+  const setSpendField = (k: keyof typeof spendForm) => (
+    e: React.ChangeEvent<any>
+  ) => setSpendForm((f) => ({ ...f, [k]: e.target.value }));
 
   if (!data) return <div className="empty">Loading…</div>;
 
@@ -135,7 +213,7 @@ export default function AnalyticsPage() {
           <p className="sub">{percent(data.conversionRate)} conversion rate</p>
         </div>
         <div className="stat">
-          <p className="label">Total spend</p>
+          <p className="label">Total ad spend</p>
           <p className="value">{money(data.totalSpend)}</p>
         </div>
         <div className="stat">
@@ -179,14 +257,14 @@ export default function AnalyticsPage() {
       {/* Per-source breakdown */}
       <div className="card">
         <div className="card-pad" style={{ paddingBottom: 0 }}>
-          <h3 className="section-title">Spend by source</h3>
+          <h3 className="section-title">Ad spend by source</h3>
         </div>
         <table className="table">
           <thead>
             <tr>
               <th>Source</th>
               <th className="num">Leads</th>
-              <th className="num">Spend</th>
+              <th className="num">Ad spend</th>
               <th className="num">Cost / lead</th>
               <th className="num">Converted</th>
               <th className="num">Conv. rate</th>
@@ -202,7 +280,7 @@ export default function AnalyticsPage() {
                 </td>
                 <td className="num">{s.leads}</td>
                 <td className="num">{money(s.spend)}</td>
-                <td className="num">{money(s.costPerLead)}</td>
+                <td className="num">{s.leads ? money(s.costPerLead) : "—"}</td>
                 <td className="num">{s.converted}</td>
                 <td className="num">{percent(s.conversionRate)}</td>
                 <td className="num">
@@ -218,6 +296,84 @@ export default function AnalyticsPage() {
         )}
       </div>
 
+      {/* Admin-only ad-spend entry. Spend is recorded per source and date, and
+          flows into the metrics above for the selected range. */}
+      {isAdmin && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-pad" style={{ paddingBottom: 0 }}>
+            <h3 className="section-title">Manage ad spend</h3>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Record ad spend per source and date. Entries within the selected
+              date range feed the metrics above.
+            </p>
+            <form onSubmit={addSpend} className="toolbar" style={{ marginBottom: 16 }}>
+              <select value={spendForm.source} onChange={setSpendField("source")}>
+                {SOURCES.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={spendForm.spend_date}
+                onChange={setSpendField("spend_date")}
+              />
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Amount ($)"
+                value={spendForm.amount}
+                onChange={setSpendField("amount")}
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={savingSpend}
+              >
+                {savingSpend ? "Saving…" : "Add spend"}
+              </button>
+              {spendError && (
+                <span style={{ color: "var(--red)" }}>{spendError}</span>
+              )}
+            </form>
+          </div>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Source</th>
+                <th className="num">Amount</th>
+                <th className="num">Recorded</th>
+                <th className="num"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {adSpend.map((e) => (
+                <tr key={e.id} style={{ cursor: "default" }}>
+                  <td>{e.spend_date}</td>
+                  <td>{e.source}</td>
+                  <td className="num">{money(e.amount)}</td>
+                  <td className="num muted">{dateTime(e.created_at)}</td>
+                  <td className="num">
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={() => deleteSpend(e.id)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {adSpend.length === 0 && (
+            <div className="empty">
+              No ad spend recorded for this date range yet.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Per-agent performance */}
       <div className="card" style={{ marginTop: 24 }}>
         <div className="card-pad" style={{ paddingBottom: 0 }}>
@@ -231,7 +387,6 @@ export default function AnalyticsPage() {
               <th className="num">Calls logged</th>
               <th className="num">Converted</th>
               <th className="num">Conv. rate</th>
-              <th className="num">Spend</th>
               <th className="num">Revenue</th>
             </tr>
           </thead>
@@ -245,7 +400,6 @@ export default function AnalyticsPage() {
                 <td className="num">{a.calls}</td>
                 <td className="num">{a.converted}</td>
                 <td className="num">{percent(a.conversionRate)}</td>
-                <td className="num">{money(a.spend)}</td>
                 <td className="num">{money(a.value)}</td>
               </tr>
             ))}

@@ -2,18 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { STATUSES, type Lead } from "@/lib/types";
-import { money } from "@/lib/format";
-
-const SOURCES = [
-  "Facebook Ads",
-  "Google Ads",
-  "LinkedIn",
-  "Referral",
-  "Website",
-  "Cold Outreach",
-  "Other",
-];
+import { STATUSES, SOURCES, type Lead } from "@/lib/types";
 
 // Sentinel option value for the bulk "Unassigned" choice (so it's distinct
 // from the empty "Assign to…" placeholder).
@@ -23,10 +12,9 @@ const emptyForm = {
   name: "",
   email: "",
   phone: "",
-  company: "",
   source: "Facebook Ads",
   status: "New",
-  spend: "",
+  annuity_production: "",
   value: "",
   assigned_agent: "",
   notes: "",
@@ -132,7 +120,6 @@ export default function LeadsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        spend: Number(form.spend) || 0,
         value: Number(form.value) || 0,
       }),
     });
@@ -212,7 +199,7 @@ export default function LeadsPage() {
       <div className="toolbar">
         <input
           className="search"
-          placeholder="Search name, email, company, phone…"
+          placeholder="Search name, email, phone…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -310,12 +297,11 @@ export default function LeadsPage() {
                 />
               </th>
               <th>Name</th>
-              <th>Company</th>
               <th>Phone</th>
               <th>Source</th>
               <th>Status</th>
               <th>Agent</th>
-              <th className="num">Spend</th>
+              <th>Annuity production</th>
             </tr>
           </thead>
           <tbody>
@@ -342,14 +328,13 @@ export default function LeadsPage() {
                     {l.email}
                   </div>
                 </td>
-                <td>{l.company || <span className="muted">—</span>}</td>
                 <td>{l.phone || <span className="muted">—</span>}</td>
                 <td>{l.source}</td>
                 <td>
                   <span className={`badge badge-${l.status}`}>{l.status}</span>
                 </td>
                 <td>{l.assigned_agent || <span className="muted">—</span>}</td>
-                <td className="num">{money(l.spend)}</td>
+                <td>{l.annuity_production || <span className="muted">—</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -396,10 +381,6 @@ export default function LeadsPage() {
                     <input value={form.phone} onChange={set("phone")} />
                   </div>
                   <div className="field">
-                    <label>Company</label>
-                    <input value={form.company} onChange={set("company")} />
-                  </div>
-                  <div className="field">
                     <label>Assigned agent</label>
                     <select
                       value={form.assigned_agent}
@@ -430,16 +411,6 @@ export default function LeadsPage() {
                     </select>
                   </div>
                   <div className="field">
-                    <label>Ad spend / acquisition cost ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={form.spend}
-                      onChange={set("spend")}
-                    />
-                  </div>
-                  <div className="field">
                     <label>Deal value ($)</label>
                     <input
                       type="number"
@@ -447,6 +418,14 @@ export default function LeadsPage() {
                       min="0"
                       value={form.value}
                       onChange={set("value")}
+                    />
+                  </div>
+                  <div className="field full">
+                    <label>Annuity production</label>
+                    <input
+                      value={form.annuity_production}
+                      onChange={set("annuity_production")}
+                      placeholder="e.g. MYGA, 5-year, $120k premium"
                     />
                   </div>
                   <div className="field full">

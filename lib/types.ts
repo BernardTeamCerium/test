@@ -14,20 +14,41 @@ export type Status = (typeof STATUSES)[number];
 // Statuses that count as a successful conversion in analytics.
 export const CONVERTED_STATUSES: Status[] = ["Converted"];
 
+// Marketing channels a lead can come from. Shared by the lead forms and the
+// analytics ad-spend entry form so the source lists stay in sync.
+export const SOURCES = [
+  "Facebook Ads",
+  "Google Ads",
+  "LinkedIn",
+  "Referral",
+  "Website",
+  "Cold Outreach",
+  "Other",
+] as const;
+
 export interface Lead {
   id: number;
   name: string;
   email: string;
   phone: string;
-  company: string;
   source: string; // marketing channel, e.g. "Facebook Ads", used for spend analysis
   status: Status;
-  spend: number; // amount spent to acquire this lead (acquisition cost)
+  annuity_production: string; // free-text annuity production detail
   value: number; // deal value once converted (revenue)
   assigned_agent: string;
   notes: string;
   created_at: string;
   updated_at: string;
+}
+
+// Admin-entered ad spend, recorded per source and per date. Ad spend lives only
+// on the analytics side now (it is no longer a per-lead field).
+export interface AdSpend {
+  id: number;
+  source: string;
+  amount: number; // dollars spent
+  spend_date: string; // YYYY-MM-DD the spend is attributed to
+  created_at: string;
 }
 
 export interface CallLog {
