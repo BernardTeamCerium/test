@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import { toCsv } from "@/lib/csv";
+import { verifyToken, SESSION_COOKIE } from "@/lib/auth";
 import { Lead, STATUSES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +21,15 @@ const COLUMNS: (keyof Lead)[] = [
   "updated_at",
 ];
 
-// GET /api/leads/export?status=&q= -> CSV download of leads matching the same
-// filters as the Leads page (open in Google Sheets / Excel).
-export function GET(req: NextRequest) {
+// GET /api/leads/export?status=&q=&agent=&mine=1 -> CSV download of leads
+// matching the same filters as the Leads page (open in Google Sheets / Excel).
+export async function GET(req: NextRequest) {
   const db = getDb();
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
   const q = searchParams.get("q");
+  const agent = searchParams.get("agent");
+  const mine = searchParams.get("mine");
 
   const where: string[] = [];
   const params: Record<string, unknown> = {};
@@ -39,6 +42,15 @@ export function GET(req: NextRequest) {
       "(name LIKE @q OR email LIKE @q OR company LIKE @q OR phone LIKE @q)"
     );
     params.q = `%${q}%`;
+  }
+  let agentFilter = agent;
+  if (mine === "1") {
+    const session = await verifyToken(req.cookies.get(SESSION_COOKIE)?.value);
+    agentFilter = session?.username ?? " ";
+  }
+  if (agentFilter != null) {
+    where.push("assigned_agent = @agent");
+    params.agent = agentFilter;
   }
 
   const sql =

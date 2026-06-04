@@ -34,6 +34,8 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [mine, setMine] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -47,16 +49,30 @@ export default function LeadsPage() {
   const [bulkAgent, setBulkAgent] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // Build the query string shared by the list fetch and the CSV export link.
+  const filterParams = useCallback(() => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (statusFilter) params.set("status", statusFilter);
-    const res = await fetch(`/api/leads?${params.toString()}`);
+    if (mine) params.set("mine", "1");
+    return params;
+  }, [q, statusFilter, mine]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`/api/leads?${filterParams().toString()}`);
     setLeads(await res.json());
     setSelected(new Set());
     setLoading(false);
-  }, [q, statusFilter]);
+  }, [filterParams]);
+
+  // Resolve the logged-in user so the "My leads" toggle can label itself.
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setUsername(d?.username ?? null))
+      .catch(() => {});
+  }, []);
 
   function toggleOne(id: number) {
     setSelected((prev) => {
@@ -157,13 +173,7 @@ export default function LeadsPage() {
           <p>Every lead in your pipeline. Click a row to call and update it.</p>
         </div>
         <div className="inline">
-          <a
-            className="btn"
-            href={`/api/leads/export?${new URLSearchParams({
-              ...(q ? { q } : {}),
-              ...(statusFilter ? { status: statusFilter } : {}),
-            }).toString()}`}
-          >
+          <a className="btn" href={`/api/leads/export?${filterParams().toString()}`}>
             ↓ Export CSV
           </a>
           <button className="btn" onClick={() => fileInput.current?.click()}>
@@ -209,6 +219,17 @@ export default function LeadsPage() {
             </option>
           ))}
         </select>
+        <button
+          className={`btn ${mine ? "btn-primary" : ""}`}
+          onClick={() => setMine((m) => !m)}
+          title={
+            username
+              ? `Show only leads assigned to ${username}`
+              : "Show only your leads"
+          }
+        >
+          {mine ? "✓ " : ""}My leads{username ? ` (${username})` : ""}
+        </button>
       </div>
 
       {selected.size > 0 && (

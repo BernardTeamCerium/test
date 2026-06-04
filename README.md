@@ -8,14 +8,15 @@ to configure.
 
 - **Login** — the app is protected by a sign-in screen; only authenticated
   users can view or change leads.
-- **Leads page** — see every lead in your pipeline, search/filter them, add new
-  leads through a built-in form, and run **bulk actions** (set status, assign an
-  agent, or delete many leads at once via row checkboxes). Data is stored in a
-  real database.
+- **Leads page** — see every lead in your pipeline, search/filter them, toggle
+  **"My leads"** to show only those assigned to you, add new leads through a
+  built-in form, and run **bulk actions** (set status, assign an agent, or
+  delete many leads at once via row checkboxes). Data is stored in a real
+  database.
 - **Lead detail page** — agents open a lead, **click to call** the phone number,
   **log call outcomes**, **edit details**, **move the lead through the funnel**
-  (New → Contacted → Qualified → Converted / Lost), and see an **activity
-  timeline** combining calls, status changes, and edits.
+  (New → Contacted → Qualified → Converted / Lost), and see a **filterable
+  activity timeline** (calls / status changes / edits) combining every event.
 - **Analytics page** — how many leads converted, your conversion rate, total ad
   spend, **cost per lead**, **cost per conversion**, revenue, ROI, a pipeline
   funnel chart, a **per-source** spend breakdown, and a **per-agent

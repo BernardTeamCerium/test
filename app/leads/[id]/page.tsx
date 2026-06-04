@@ -69,6 +69,11 @@ export default function LeadDetailPage({
   const [edit, setEdit] = useState<Record<string, string>>({});
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Timeline filter
+  const [tlFilter, setTlFilter] = useState<"all" | "call" | "status" | "edit">(
+    "all"
+  );
+
   const load = useCallback(async () => {
     const res = await fetch(`/api/leads/${params.id}`);
     if (res.status === 404) {
@@ -291,23 +296,60 @@ export default function LeadDetailPage({
           </div>
 
           <div className="card card-pad">
-            <h3 className="section-title">
-              Activity timeline ({lead.timeline.length})
-            </h3>
-            {lead.timeline.length === 0 && (
-              <p className="muted">No activity yet.</p>
-            )}
-            {lead.timeline.map((t, i) => (
-              <div className="call-item" key={i}>
-                <div>
-                  <span style={{ marginRight: 6 }}>{TIMELINE_ICON[t.kind]}</span>
-                  <strong>{t.title}</strong>
-                  {t.actor && ` · ${t.actor}`}
-                </div>
-                {t.detail && <div>{t.detail}</div>}
-                <div className="call-meta">{dateTime(t.created_at)}</div>
-              </div>
-            ))}
+            {(() => {
+              const FILTERS: {
+                key: typeof tlFilter;
+                label: string;
+                match: (k: TimelineItem["kind"]) => boolean;
+              }[] = [
+                { key: "all", label: "All", match: () => true },
+                { key: "call", label: "Calls", match: (k) => k === "call" },
+                { key: "status", label: "Status", match: (k) => k === "status" },
+                {
+                  key: "edit",
+                  label: "Edits",
+                  match: (k) => k === "edited" || k === "created",
+                },
+              ];
+              const active = FILTERS.find((f) => f.key === tlFilter)!;
+              const items = lead.timeline.filter((t) => active.match(t.kind));
+              return (
+                <>
+                  <h3 className="section-title">
+                    Activity timeline ({items.length})
+                  </h3>
+                  <div className="inline" style={{ marginBottom: 12 }}>
+                    {FILTERS.map((f) => (
+                      <button
+                        key={f.key}
+                        className={`btn btn-sm ${
+                          tlFilter === f.key ? "btn-primary" : ""
+                        }`}
+                        onClick={() => setTlFilter(f.key)}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  {items.length === 0 && (
+                    <p className="muted">No matching activity.</p>
+                  )}
+                  {items.map((t, i) => (
+                    <div className="call-item" key={i}>
+                      <div>
+                        <span style={{ marginRight: 6 }}>
+                          {TIMELINE_ICON[t.kind]}
+                        </span>
+                        <strong>{t.title}</strong>
+                        {t.actor && ` · ${t.actor}`}
+                      </div>
+                      {t.detail && <div>{t.detail}</div>}
+                      <div className="call-meta">{dateTime(t.created_at)}</div>
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>
