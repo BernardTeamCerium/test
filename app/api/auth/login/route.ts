@@ -15,13 +15,22 @@ export async function POST(req: NextRequest) {
   const user = db
     .prepare("SELECT * FROM users WHERE username = ?")
     .get(username) as
-    | { username: string; password_hash: string; role: string }
+    | { username: string; password_hash: string; role: string; status: string }
     | undefined;
 
   if (!user || !verifyPassword(password, user.password_hash)) {
     return NextResponse.json(
       { error: "Invalid username or password." },
       { status: 401 }
+    );
+  }
+
+  // Accounts created via self-service sign-up start as "pending" and can't log
+  // in until an admin approves them.
+  if (user.status === "pending") {
+    return NextResponse.json(
+      { error: "Your account is awaiting admin approval." },
+      { status: 403 }
     );
   }
 
