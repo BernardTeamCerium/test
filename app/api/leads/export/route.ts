@@ -10,10 +10,9 @@ const COLUMNS: (keyof Lead)[] = [
   "name",
   "email",
   "phone",
-  "company",
   "source",
   "status",
-  "spend",
+  "annuity_production",
   "value",
   "assigned_agent",
   "notes",
@@ -38,9 +37,7 @@ export async function GET(req: NextRequest) {
     params.status = status;
   }
   if (q) {
-    where.push(
-      "(name LIKE @q OR email LIKE @q OR company LIKE @q OR phone LIKE @q)"
-    );
+    where.push("(name LIKE @q OR email LIKE @q OR phone LIKE @q)");
     params.q = `%${q}%`;
   }
   let agentFilter = agent;

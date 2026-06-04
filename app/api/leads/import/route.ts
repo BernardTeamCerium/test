@@ -14,16 +14,14 @@ const ALIASES: Record<string, string> = {
   phone: "phone",
   "phone number": "phone",
   mobile: "phone",
-  company: "company",
-  organization: "company",
   source: "source",
   channel: "source",
   status: "status",
   stage: "status",
-  spend: "spend",
-  cost: "spend",
-  "ad spend": "spend",
-  "acquisition cost": "spend",
+  annuity_production: "annuity_production",
+  "annuity production": "annuity_production",
+  annuity: "annuity_production",
+  production: "annuity_production",
   value: "value",
   "deal value": "value",
   revenue: "value",
@@ -60,8 +58,8 @@ export async function POST(req: NextRequest) {
   }
 
   const insert = db.prepare(`
-    INSERT INTO leads (name, email, phone, company, source, status, spend, value, assigned_agent, notes)
-    VALUES (@name, @email, @phone, @company, @source, @status, @spend, @value, @assigned_agent, @notes)
+    INSERT INTO leads (name, email, phone, source, status, annuity_production, value, assigned_agent, notes)
+    VALUES (@name, @email, @phone, @source, @status, @annuity_production, @value, @assigned_agent, @notes)
   `);
 
   let imported = 0;
@@ -85,10 +83,9 @@ export async function POST(req: NextRequest) {
       name,
       email: r.email ?? "",
       phone: r.phone ?? "",
-      company: r.company ?? "",
       source: (r.source ?? "").trim() || "Other",
       status: normalizeStatus(r.status ?? "New"),
-      spend: Number(String(r.spend ?? "").replace(/[$,]/g, "")) || 0,
+      annuity_production: r.annuity_production ?? "",
       value: Number(String(r.value ?? "").replace(/[$,]/g, "")) || 0,
       assigned_agent: r.assigned_agent ?? "",
       notes: r.notes ?? "",

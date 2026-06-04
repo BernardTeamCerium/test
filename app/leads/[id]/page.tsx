@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { STATUSES, type Lead, type CallLog } from "@/lib/types";
+import { STATUSES, SOURCES, type Lead, type CallLog } from "@/lib/types";
 import { money, dateTime } from "@/lib/format";
 
 interface TimelineItem {
@@ -25,24 +25,13 @@ const TIMELINE_ICON: Record<TimelineItem["kind"], string> = {
 
 const OUTCOMES = ["Answered", "Voicemail", "No answer", "Wrong number", "Callback requested"];
 
-const SOURCES = [
-  "Facebook Ads",
-  "Google Ads",
-  "LinkedIn",
-  "Referral",
-  "Website",
-  "Cold Outreach",
-  "Other",
-];
-
 const EDIT_FIELDS = [
   "name",
   "email",
   "phone",
-  "company",
   "source",
   "assigned_agent",
-  "spend",
+  "annuity_production",
   "value",
   "notes",
 ] as const;
@@ -150,7 +139,6 @@ export default function LeadDetailPage({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...edit,
-        spend: Number(edit.spend) || 0,
         value: Number(edit.value) || 0,
         actor: me ?? "",
       }),
@@ -188,7 +176,7 @@ export default function LeadDetailPage({
         <div>
           <h1>{lead.name}</h1>
           <p>
-            {lead.company || "No company"} ·{" "}
+            {lead.source} ·{" "}
             <span className={`badge badge-${lead.status}`}>{lead.status}</span>
           </p>
         </div>
@@ -223,14 +211,12 @@ export default function LeadDetailPage({
               </dd>
               <dt>Phone</dt>
               <dd>{lead.phone || <span className="muted">—</span>}</dd>
-              <dt>Company</dt>
-              <dd>{lead.company || <span className="muted">—</span>}</dd>
               <dt>Source</dt>
               <dd>{lead.source}</dd>
               <dt>Assigned agent</dt>
               <dd>{lead.assigned_agent || <span className="muted">Unassigned</span>}</dd>
-              <dt>Ad spend</dt>
-              <dd>{money(lead.spend)}</dd>
+              <dt>Annuity production</dt>
+              <dd>{lead.annuity_production || <span className="muted">—</span>}</dd>
               <dt>Deal value</dt>
               <dd>{money(lead.value)}</dd>
               <dt>Created</dt>
@@ -413,13 +399,6 @@ export default function LeadDetailPage({
                     <input value={edit.phone} onChange={setField("phone")} />
                   </div>
                   <div className="field">
-                    <label>Company</label>
-                    <input
-                      value={edit.company}
-                      onChange={setField("company")}
-                    />
-                  </div>
-                  <div className="field">
                     <label>Assigned agent</label>
                     <select
                       value={edit.assigned_agent}
@@ -449,16 +428,6 @@ export default function LeadDetailPage({
                     </select>
                   </div>
                   <div className="field">
-                    <label>Ad spend / acquisition cost ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={edit.spend}
-                      onChange={setField("spend")}
-                    />
-                  </div>
-                  <div className="field">
                     <label>Deal value ($)</label>
                     <input
                       type="number"
@@ -466,6 +435,14 @@ export default function LeadDetailPage({
                       min="0"
                       value={edit.value}
                       onChange={setField("value")}
+                    />
+                  </div>
+                  <div className="field full">
+                    <label>Annuity production</label>
+                    <input
+                      value={edit.annuity_production}
+                      onChange={setField("annuity_production")}
+                      placeholder="e.g. MYGA, 5-year, $120k premium"
                     />
                   </div>
                   <div className="field full">

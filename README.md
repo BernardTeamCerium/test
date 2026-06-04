@@ -144,19 +144,23 @@ npm start
 
 ## Data model
 
-Each **lead** has: name, email, phone, company, source (marketing channel),
-status, **spend** (acquisition cost), **value** (deal revenue), assigned agent,
-and notes. Each **call** logs the agent, outcome, a note, and a timestamp, and
-can update the lead's status in one step.
+Each **lead** has: name, email, phone, source (marketing channel), status,
+**annuity production** (free-text production detail), **value** (deal revenue),
+assigned agent, and notes. Each **call** logs the agent, outcome, a note, and a
+timestamp, and can update the lead's status in one step.
+
+**Ad spend** is no longer tracked per lead. Admins record it on the **Analytics**
+tab, per source and per date (the `ad_spend` table). Spend within the selected
+date range feeds the cost-per-lead, cost-per-conversion, and ROI metrics.
 
 ## How the metrics are calculated
 
 | Metric              | Formula                              |
 | ------------------- | ------------------------------------ |
 | Conversion rate     | converted leads ÷ total leads        |
-| Cost per lead       | total spend ÷ total leads            |
-| Cost per conversion | total spend ÷ converted leads        |
-| ROI                 | (total revenue − total spend) ÷ spend|
+| Cost per lead       | total ad spend ÷ total leads         |
+| Cost per conversion | total ad spend ÷ converted leads     |
+| ROI                 | (total revenue − ad spend) ÷ ad spend|
 
 "Converted" counts leads in the **Converted** status. To change which statuses
 count as a conversion, edit `CONVERTED_STATUSES` in `lib/types.ts`.
@@ -189,17 +193,17 @@ Sheets (or Excel) via CSV — no API keys required:
   that file here.
 
 Import header matching is case-insensitive and accepts common aliases
-(`agent`/`owner` → assigned agent, `cost`/`ad spend` → spend, `revenue` →
-value, `stage` → status, etc.), so a sheet exported from most tools maps
-without renaming columns. The recommended columns are:
+(`agent`/`owner` → assigned agent, `annuity`/`production` → annuity production,
+`revenue` → value, `stage` → status, etc.), so a sheet exported from most tools
+maps without renaming columns. The recommended columns are:
 
 ```
-name, email, phone, company, source, status, spend, value, assigned_agent, notes
+name, email, phone, source, status, annuity_production, value, assigned_agent, notes
 ```
 
 ## Editing leads
 
 Open any lead and click **Edit** to update its details (name, contact info,
-source, spend, value, notes). Status changes happen from the lead's pipeline
-buttons or while logging a call.
+source, annuity production, value, notes). Status changes happen from the lead's
+pipeline buttons or while logging a call.
 ```
