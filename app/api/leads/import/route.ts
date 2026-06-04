@@ -45,7 +45,7 @@ function normalizeStatus(raw: string): Status {
 // POST /api/leads/import  body: { csv: string }
 // Each non-empty row with a name becomes a new lead. Returns counts.
 export async function POST(req: NextRequest) {
-  const db = getDb();
+  const db = await getDb();
   const body = await req.json().catch(() => ({}));
   const csv = String(body.csv ?? "");
   if (!csv.trim()) {
@@ -67,38 +67,34 @@ export async function POST(req: NextRequest) {
   let imported = 0;
   let skipped = 0;
 
-  const run = db.transaction((rows: Record<string, string>[]) => {
-    for (const raw of rows) {
-      // Remap headers through the alias table.
-      const r: Record<string, string> = {};
-      for (const [key, val] of Object.entries(raw)) {
-        const canonical = ALIASES[key];
-        if (canonical) r[canonical] = val;
-      }
-
-      const name = (r.name ?? "").trim();
-      if (!name) {
-        skipped++;
-        continue;
-      }
-
-      insert.run({
-        name,
-        email: r.email ?? "",
-        phone: r.phone ?? "",
-        company: r.company ?? "",
-        source: (r.source ?? "").trim() || "Other",
-        status: normalizeStatus(r.status ?? "New"),
-        spend: Number(String(r.spend ?? "").replace(/[$,]/g, "")) || 0,
-        value: Number(String(r.value ?? "").replace(/[$,]/g, "")) || 0,
-        assigned_agent: r.assigned_agent ?? "",
-        notes: r.notes ?? "",
-      });
-      imported++;
+  for (const raw of records) {
+    // Remap headers through the alias table.
+    const r: Record<string, string> = {};
+    for (const [key, val] of Object.entries(raw)) {
+      const canonical = ALIASES[key];
+      if (canonical) r[canonical] = val;
     }
-  });
 
-  run(records);
+    const name = (r.name ?? "").trim();
+    if (!name) {
+      skipped++;
+      continue;
+    }
+
+    await insert.run({
+      name,
+      email: r.email ?? "",
+      phone: r.phone ?? "",
+      company: r.company ?? "",
+      source: (r.source ?? "").trim() || "Other",
+      status: normalizeStatus(r.status ?? "New"),
+      spend: Number(String(r.spend ?? "").replace(/[$,]/g, "")) || 0,
+      value: Number(String(r.value ?? "").replace(/[$,]/g, "")) || 0,
+      assigned_agent: r.assigned_agent ?? "",
+      notes: r.notes ?? "",
+    });
+    imported++;
+  }
 
   return NextResponse.json({ imported, skipped });
 }

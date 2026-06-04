@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 // GET /api/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD
 // Headline metrics, funnel counts, and a per-source breakdown, optionally
 // scoped to leads created within an (inclusive) date range.
-export function GET(req: NextRequest) {
-  const db = getDb();
+export async function GET(req: NextRequest) {
+  const db = await getDb();
   const { searchParams } = new URL(req.url);
   const from = searchParams.get("from"); // inclusive, by lead created_at date
   const to = searchParams.get("to"); // inclusive
@@ -26,7 +26,7 @@ export function GET(req: NextRequest) {
   const sql =
     "SELECT * FROM leads" +
     (where.length ? " WHERE " + where.join(" AND ") : "");
-  const leads = db.prepare(sql).all(params) as Lead[];
+  const leads = (await db.prepare(sql).all(params)) as Lead[];
 
   const totalLeads = leads.length;
   const totalSpend = leads.reduce((s, l) => s + (l.spend || 0), 0);
@@ -106,13 +106,13 @@ export function GET(req: NextRequest) {
     callWhere.push("date(created_at) <= date(@to)");
     callParams.to = to;
   }
-  const callCounts = db
+  const callCounts = (await db
     .prepare(
       `SELECT agent, COUNT(*) AS n FROM call_logs WHERE ${callWhere.join(
         " AND "
       )} GROUP BY agent`
     )
-    .all(callParams) as { agent: string; n: number }[];
+    .all(callParams)) as { agent: string; n: number }[];
   for (const c of callCounts) agentRow(c.agent).calls += c.n;
 
   const byAgent = Array.from(agentMap.values())

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // Public self-registration. New accounts are created as a *pending* agent and
 // cannot log in until an admin approves them.
 export async function POST(req: NextRequest) {
-  const db = getDb();
+  const db = await getDb();
   const body = await req.json().catch(() => ({}));
   const username = String(body.username ?? "").trim();
   const password = String(body.password ?? "");
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  const exists = db
+  const exists = await db
     .prepare("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE")
     .get(username);
   if (exists) {
@@ -32,9 +32,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  db.prepare(
-    "INSERT INTO users (username, password_hash, role, status) VALUES (?, ?, 'agent', 'pending')"
-  ).run(username, hashPassword(password));
+  await db
+    .prepare(
+      "INSERT INTO users (username, password_hash, role, status) VALUES (?, ?, 'agent', 'pending')"
+    )
+    .run(username, hashPassword(password));
 
   return NextResponse.json(
     { ok: true, status: "pending" },

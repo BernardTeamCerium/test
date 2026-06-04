@@ -1,8 +1,9 @@
 # Lead CRM
 
-A simple, self-contained CRM web app for managing sales leads. Built with
-**Next.js** (App Router) and a local **SQLite** database — no external services
-to configure.
+A CRM web app for managing sales leads. Built with **Next.js** (App Router) and
+**libSQL/SQLite**. It runs against a local SQLite file for development and a
+hosted **[Turso](https://turso.tech)** database in production — so it works on
+serverless hosts like Vercel with real persistence.
 
 ## What it does
 
@@ -107,11 +108,34 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:3000. The database (`data/crm.db`) is created
-automatically on first run and seeded with sample leads so you can see how it
-works. Delete `data/crm.db` to start from an empty database.
+Then open http://localhost:3000. With no Turso env vars set, the app uses a
+local SQLite file at `data/crm.db`, created automatically on first run and
+seeded with sample leads. Delete `data/crm.db` to start from an empty database.
 
-For production:
+## Deploying (Vercel + Turso)
+
+Serverless hosts like Vercel have a **read-only, ephemeral filesystem**, so a
+local SQLite *file* can't be used in production. Point the app at a hosted
+[Turso](https://turso.tech) database instead (Turso speaks libSQL/SQLite, so no
+code changes are needed):
+
+1. Create a database with the [Turso CLI](https://docs.turso.tech): `turso db create lead-crm`
+2. Get its URL: `turso db show lead-crm --url` (looks like `libsql://…turso.io`)
+3. Create a token: `turso db tokens create lead-crm`
+4. In your Vercel project settings → Environment Variables, set:
+
+```
+TURSO_DATABASE_URL=libsql://your-db.turso.io
+TURSO_AUTH_TOKEN=your-token
+AUTH_SECRET=some-long-random-string
+ADMIN_PASSWORD=a-strong-password        # optional; defaults to "changeme"
+ADMIN_USERNAME=bernard@teamcerium.com   # optional; this is the default
+```
+
+On first request the app creates its tables and ensures the admin account
+exists in Turso. The data then persists across deploys and instances.
+
+For a local production build:
 
 ```bash
 npm run build
@@ -144,13 +168,13 @@ app/
   leads/            # list + add-lead form
   leads/[id]/       # detail: call, log calls, update status
   analytics/        # conversion & spend dashboard
-  api/              # REST endpoints backed by SQLite
+  api/              # REST endpoints backed by libSQL
 lib/
-  db.ts             # SQLite connection, schema, seed data
+  db.ts             # libSQL client (Turso or local file), schema, seed
   types.ts          # shared types + the status funnel
   format.ts         # money / percent / date helpers
 data/
-  crm.db            # the database (created at runtime, git-ignored)
+  crm.db            # local dev database (created at runtime, git-ignored)
 ```
 
 ## Google Sheets / spreadsheet workflow
