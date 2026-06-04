@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import UserMenu from "./UserMenu";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "Lead CRM",
@@ -25,6 +26,7 @@ export default function RootLayout({
           </div>
         </header>
         <main className="container">{children}</main>
+        <Analytics />
       </body>
     </html>
   );
