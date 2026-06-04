@@ -57,6 +57,10 @@ export default function LeadDetailPage({
   const [notFound, setNotFound] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
 
+  // Current user + agent list for assignment / call dropdowns
+  const [me, setMe] = useState<string | null>(null);
+  const [agents, setAgents] = useState<string[]>([]);
+
   // Call-logging form
   const [agent, setAgent] = useState("");
   const [outcome, setOutcome] = useState(OUTCOMES[0]);
@@ -83,20 +87,35 @@ export default function LeadDetailPage({
     const data = await res.json();
     setLead(data);
     setNewStatus(data.status);
-    if (!agent && data.assigned_agent) setAgent(data.assigned_agent);
-  }, [params.id, agent]);
+  }, [params.id]);
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
+  // Load current user (default caller) and the agent list for dropdowns.
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const u = d?.username ?? null;
+        setMe(u);
+        setAgent((a) => a || u || "");
+      })
+      .catch(() => {});
+    fetch("/api/users")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list) => setAgents(list.map((u: { username: string }) => u.username)))
+      .catch(() => {});
+  }, []);
+
   async function changeStatus(status: string) {
     setSavingStatus(true);
     await fetch(`/api/leads/${params.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, actor: me ?? "" }),
     });
     setSavingStatus(false);
     load();
@@ -133,6 +152,7 @@ export default function LeadDetailPage({
         ...edit,
         spend: Number(edit.spend) || 0,
         value: Number(edit.value) || 0,
+        actor: me ?? "",
       }),
     });
     setSavingEdit(false);
@@ -248,11 +268,17 @@ export default function LeadDetailPage({
             <form onSubmit={logCall} className="row-gap">
               <div className="field">
                 <label>Agent</label>
-                <input
-                  value={agent}
-                  onChange={(e) => setAgent(e.target.value)}
-                  placeholder="Your name"
-                />
+                <select value={agent} onChange={(e) => setAgent(e.target.value)}>
+                  {/* Keep any pre-existing value selectable even if not a user. */}
+                  {agent && !agents.includes(agent) && (
+                    <option value={agent}>{agent}</option>
+                  )}
+                  {agents.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="field">
                 <label>Outcome</label>
@@ -395,10 +421,24 @@ export default function LeadDetailPage({
                   </div>
                   <div className="field">
                     <label>Assigned agent</label>
-                    <input
+                    <select
                       value={edit.assigned_agent}
                       onChange={setField("assigned_agent")}
-                    />
+                    >
+                      <option value="">Unassigned</option>
+                      {/* Preserve a non-user value (e.g. from CSV import). */}
+                      {edit.assigned_agent &&
+                        !agents.includes(edit.assigned_agent) && (
+                          <option value={edit.assigned_agent}>
+                            {edit.assigned_agent} (not a user)
+                          </option>
+                        )}
+                      {agents.map((a) => (
+                        <option key={a} value={a}>
+                          {a}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="field">
                     <label>Source</label>

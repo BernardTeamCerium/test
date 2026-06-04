@@ -15,6 +15,10 @@ const SOURCES = [
   "Other",
 ];
 
+// Sentinel option value for the bulk "Unassigned" choice (so it's distinct
+// from the empty "Assign to…" placeholder).
+const UNASSIGN = "__unassigned__";
+
 const emptyForm = {
   name: "",
   email: "",
@@ -36,6 +40,7 @@ export default function LeadsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [mine, setMine] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [agents, setAgents] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -46,7 +51,6 @@ export default function LeadsPage() {
   // Bulk selection
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
-  const [bulkAgent, setBulkAgent] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
 
   // Build the query string shared by the list fetch and the CSV export link.
@@ -66,11 +70,16 @@ export default function LeadsPage() {
     setLoading(false);
   }, [filterParams]);
 
-  // Resolve the logged-in user so the "My leads" toggle can label itself.
+  // Resolve the logged-in user (for the "My leads" label) and the list of
+  // agents (for assignment dropdowns).
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setUsername(d?.username ?? null))
+      .catch(() => {});
+    fetch("/api/users")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list) => setAgents(list.map((u: { username: string }) => u.username)))
       .catch(() => {});
   }, []);
 
@@ -102,7 +111,6 @@ export default function LeadsPage() {
     });
     setBulkBusy(false);
     setBulkStatus("");
-    setBulkAgent("");
     load();
   }
 
@@ -251,20 +259,22 @@ export default function LeadsPage() {
               </option>
             ))}
           </select>
-          <input
-            placeholder="Assign agent…"
-            value={bulkAgent}
-            onChange={(e) => setBulkAgent(e.target.value)}
-            style={{ width: 150 }}
-            disabled={bulkBusy}
-          />
-          <button
-            className="btn btn-sm"
-            onClick={() => runBulk("assign", bulkAgent)}
+          <select
+            value=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) runBulk("assign", v === UNASSIGN ? "" : v);
+            }}
             disabled={bulkBusy}
           >
-            Assign
-          </button>
+            <option value="">Assign to…</option>
+            <option value={UNASSIGN}>Unassigned</option>
+            {agents.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
           <button
             className="btn btn-sm btn-danger"
             onClick={() => runBulk("delete")}
@@ -391,10 +401,17 @@ export default function LeadsPage() {
                   </div>
                   <div className="field">
                     <label>Assigned agent</label>
-                    <input
+                    <select
                       value={form.assigned_agent}
                       onChange={set("assigned_agent")}
-                    />
+                    >
+                      <option value="">Unassigned</option>
+                      {agents.map((a) => (
+                        <option key={a} value={a}>
+                          {a}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="field">
                     <label>Source</label>

@@ -75,16 +75,25 @@ function createDb(): Database.Database {
 
 // Seed an initial login so the app is usable on first run. Credentials come
 // from ADMIN_USERNAME / ADMIN_PASSWORD env vars, defaulting to admin / admin.
+// The demo agents referenced by the seed leads are also created as real users
+// (default password "changeme") so lead assignments line up with logins.
 function seedAdminIfEmpty(db: Database.Database) {
   const count = db.prepare("SELECT COUNT(*) AS n FROM users").get() as {
     n: number;
   };
   if (count.n > 0) return;
+
+  const insert = db.prepare(
+    "INSERT INTO users (username, password_hash) VALUES (?, ?)"
+  );
   const username = process.env.ADMIN_USERNAME || "admin";
   const password = process.env.ADMIN_PASSWORD || "admin";
-  db.prepare(
-    "INSERT INTO users (username, password_hash) VALUES (?, ?)"
-  ).run(username, hashPassword(password));
+  insert.run(username, hashPassword(password));
+
+  for (const agent of ["Dana", "Miguel", "Priya"]) {
+    if (agent === username) continue;
+    insert.run(agent, hashPassword("changeme"));
+  }
 }
 
 function seedIfEmpty(db: Database.Database) {

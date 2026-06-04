@@ -35,6 +35,7 @@ export default function UserMenu() {
     <nav className="nav">
       <Link href="/leads">Leads</Link>
       <Link href="/analytics">Analytics</Link>
+      <Link href="/settings">Settings</Link>
       <span className="nav-user">{username}</span>
       <button className="nav-logout" onClick={logout}>
         Log out

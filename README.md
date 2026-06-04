@@ -50,6 +50,20 @@ hashed with scrypt. The seed user is only created when the `users` table is
 empty, so changing the env vars later won't overwrite an existing login —
 delete `data/crm.db` (or add more users) to reset.
 
+### Agents & users
+
+People who can log in are managed on the **Settings** page (add or remove
+agents). Each agent is a real user, and lead assignment uses a **dropdown of
+those users** everywhere (add-lead form, edit, bulk assign, and the call-logging
+agent) — so assignments always match a login and the **"My leads"** filter and
+per-agent analytics line up reliably.
+
+For convenience the demo seeds three agent logins — **Dana**, **Miguel**, and
+**Priya** (password `changeme`) — matching the sample leads. Change or remove
+them on the Settings page (or set your own before first run). CSV import still
+accepts free-text agent names; if an imported name isn't a user it's preserved
+and shown as "(not a user)" in the edit dropdown until you reassign it.
+
 ## Continuous integration
 
 Every push and pull request runs **lint + build** via GitHub Actions
