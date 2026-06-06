@@ -6,8 +6,9 @@ import { type AdSpend } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 // GET /api/ad-spend?from=YYYY-MM-DD&to=YYYY-MM-DD
-// List ad-spend entries (newest first), optionally scoped to a date range by
-// spend_date. Any signed-in user can read; only admins can mutate (POST/DELETE).
+// List ad-spend entries (newest month first), optionally scoped to a range. The
+// range is a date window; entries are matched by the calendar month (YYYY-MM)
+// of from/to. Any signed-in user can read; only admins can mutate.
 export async function GET(req: NextRequest) {
   const db = await getDb();
   const { searchParams } = new URL(req.url);
@@ -17,23 +18,23 @@ export async function GET(req: NextRequest) {
   const where: string[] = [];
   const params: Record<string, string> = {};
   if (from) {
-    where.push("date(spend_date) >= date(@from)");
-    params.from = from;
+    where.push("spend_month >= @fromMonth");
+    params.fromMonth = from.slice(0, 7);
   }
   if (to) {
-    where.push("date(spend_date) <= date(@to)");
-    params.to = to;
+    where.push("spend_month <= @toMonth");
+    params.toMonth = to.slice(0, 7);
   }
 
   const sql =
     "SELECT * FROM ad_spend" +
     (where.length ? " WHERE " + where.join(" AND ") : "") +
-    " ORDER BY date(spend_date) DESC, id DESC";
+    " ORDER BY spend_month DESC, id DESC";
   const entries = (await db.prepare(sql).all(params)) as AdSpend[];
   return NextResponse.json(entries);
 }
 
-// POST /api/ad-spend  (admin only)  body: { source, amount, spend_date }
+// POST /api/ad-spend  (admin only)  body: { source, amount, spend_month }
 export async function POST(req: NextRequest) {
   const gate = await requireAdmin();
   if (gate instanceof NextResponse) return gate;
@@ -52,17 +53,17 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  // Expect a YYYY-MM-DD date; fall back to today if missing/invalid.
-  const raw = String(body.spend_date ?? "").trim();
-  const spend_date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+  // Expect a YYYY-MM month; fall back to the current month if missing/invalid.
+  const raw = String(body.spend_month ?? "").trim();
+  const spend_month = /^\d{4}-\d{2}$/.test(raw)
     ? raw
-    : new Date().toISOString().slice(0, 10);
+    : new Date().toISOString().slice(0, 7);
 
   const info = await db
     .prepare(
-      "INSERT INTO ad_spend (source, amount, spend_date) VALUES (@source, @amount, @spend_date)"
+      "INSERT INTO ad_spend (source, amount, spend_month) VALUES (@source, @amount, @spend_month)"
     )
-    .run({ source, amount, spend_date });
+    .run({ source, amount, spend_month });
 
   const entry = await db
     .prepare("SELECT * FROM ad_spend WHERE id = ?")

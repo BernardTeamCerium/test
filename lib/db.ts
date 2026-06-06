@@ -118,13 +118,13 @@ const SCHEMA: string[] = [
      updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
    )`,
   `CREATE TABLE IF NOT EXISTS ad_spend (
-     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-     source     TEXT NOT NULL,
-     amount     REAL NOT NULL DEFAULT 0,
-     spend_date TEXT NOT NULL,
-     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+     source      TEXT NOT NULL,
+     amount      REAL NOT NULL DEFAULT 0,
+     spend_month TEXT NOT NULL,
+     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
    )`,
-  `CREATE INDEX IF NOT EXISTS idx_ad_spend_date ON ad_spend(spend_date)`,
+  `CREATE INDEX IF NOT EXISTS idx_ad_spend_month ON ad_spend(spend_month)`,
   `CREATE TABLE IF NOT EXISTS call_logs (
      id         INTEGER PRIMARY KEY AUTOINCREMENT,
      lead_id    INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
@@ -204,6 +204,25 @@ async function migrate(db: Db) {
   if (leadCols.includes("spend")) {
     await db.client.execute("ALTER TABLE leads DROP COLUMN spend");
   }
+
+  // Ad spend moved from a daily date to a calendar month (YYYY-MM). Older DBs
+  // store a spend_date; add spend_month and backfill it from the date's month.
+  const spendCols = (await db.prepare("PRAGMA table_info(ad_spend)").all()).map(
+    (c: any) => c.name as string
+  );
+  if (spendCols.length && !spendCols.includes("spend_month")) {
+    await db.client.execute(
+      "ALTER TABLE ad_spend ADD COLUMN spend_month TEXT NOT NULL DEFAULT ''"
+    );
+    if (spendCols.includes("spend_date")) {
+      await db.client.execute(
+        "UPDATE ad_spend SET spend_month = substr(spend_date, 1, 7) WHERE spend_month = ''"
+      );
+    }
+    await db.client.execute(
+      "CREATE INDEX IF NOT EXISTS idx_ad_spend_month ON ad_spend(spend_month)"
+    );
+  }
 }
 
 // Guarantee the configured admin always exists as an active admin (fresh and
@@ -277,25 +296,26 @@ async function seedAdSpendIfEmpty(db: Db) {
     .get()) as { n: number };
   if (count.n > 0) return;
 
-  const today = new Date();
-  const isoDaysAgo = (d: number) => {
-    const x = new Date(today);
-    x.setDate(x.getDate() - d);
-    return x.toISOString().slice(0, 10);
+  // Month string (YYYY-MM) N calendar months before the current month.
+  const monthsAgo = (n: number) => {
+    const x = new Date();
+    x.setDate(1);
+    x.setMonth(x.getMonth() - n);
+    return x.toISOString().slice(0, 7);
   };
 
   const sample = [
-    { source: "Facebook Ads", amount: 320.0, spend_date: isoDaysAgo(1) },
-    { source: "Google Ads", amount: 480.0, spend_date: isoDaysAgo(1) },
-    { source: "LinkedIn", amount: 150.0, spend_date: isoDaysAgo(3) },
-    { source: "Facebook Ads", amount: 300.0, spend_date: isoDaysAgo(10) },
-    { source: "Google Ads", amount: 420.0, spend_date: isoDaysAgo(10) },
+    { source: "Facebook Ads", amount: 320.0, spend_month: monthsAgo(0) },
+    { source: "Google Ads", amount: 480.0, spend_month: monthsAgo(0) },
+    { source: "LinkedIn", amount: 150.0, spend_month: monthsAgo(0) },
+    { source: "Facebook Ads", amount: 300.0, spend_month: monthsAgo(1) },
+    { source: "Google Ads", amount: 420.0, spend_month: monthsAgo(1) },
   ];
 
   for (const r of sample) {
     await db
       .prepare(
-        "INSERT INTO ad_spend (source, amount, spend_date) VALUES (@source, @amount, @spend_date)"
+        "INSERT INTO ad_spend (source, amount, spend_month) VALUES (@source, @amount, @spend_month)"
       )
       .run(r);
   }
