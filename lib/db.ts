@@ -1,7 +1,7 @@
 import { createClient, type Client, type InArgs } from "@libsql/client";
 import path from "path";
 import fs from "fs";
-import { hashPassword } from "./password";
+import { hashPassword, verifyPassword } from "./password";
 
 // ── Async wrapper ───────────────────────────────────────────────────────────
 // libSQL's client is async, so we expose a tiny wrapper that mimics the slice
@@ -226,20 +226,34 @@ async function migrate(db: Db) {
 }
 
 // Guarantee the configured admin always exists as an active admin (fresh and
-// existing DBs alike). An existing account's password is left untouched.
+// existing DBs alike). When ADMIN_PASSWORD is explicitly set in the environment
+// it is treated as the source of truth: the existing admin's password is synced
+// to it (so an ops-driven password change actually takes effect). The sync is
+// idempotent — it only writes when the stored password doesn't already match —
+// and is skipped entirely when ADMIN_PASSWORD is unset (the default fallback
+// never overwrites an existing password).
 async function ensureAdmin(db: Db) {
   const username = adminUsername();
-  const existing = await db
-    .prepare("SELECT id FROM users WHERE username = ?")
-    .get(username);
+  const existing = (await db
+    .prepare("SELECT id, password_hash FROM users WHERE username = ?")
+    .get(username)) as { id: number; password_hash: string } | undefined;
+
   if (existing) {
     await db
       .prepare(
         "UPDATE users SET role = 'admin', status = 'active' WHERE username = ?"
       )
       .run(username);
+
+    const desired = process.env.ADMIN_PASSWORD;
+    if (desired && !verifyPassword(desired, existing.password_hash)) {
+      await db
+        .prepare("UPDATE users SET password_hash = ? WHERE username = ?")
+        .run(hashPassword(desired), username);
+    }
     return;
   }
+
   await db
     .prepare(
       "INSERT OR IGNORE INTO users (username, password_hash, role, status) VALUES (?, ?, 'admin', 'active')"
