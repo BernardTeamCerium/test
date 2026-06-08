@@ -1,4 +1,4 @@
-# Lead CRM
+# Recruiting Lead CRM
 
 A CRM web app for managing sales leads. Built with **Next.js** (App Router) and
 **libSQL/SQLite**. It runs against a local SQLite file for development and a

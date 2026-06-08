@@ -37,8 +37,9 @@ function LoginForm() {
     <div className="login-wrap">
       <form className="card login-card" onSubmit={submit}>
         <div className="login-brand">
-          <span className="brand-dot" /> Lead CRM
+          <span className="brand-dot" /> Recruiting Lead CRM
         </div>
+        <p className="login-client">Allied Elite Financial</p>
         <h1 className="login-title">Sign in</h1>
         {error && <p className="login-error">{error}</p>}
         <div className="field">
