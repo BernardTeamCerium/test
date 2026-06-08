@@ -32,8 +32,9 @@ export default function SignupPage() {
     <div className="login-wrap">
       <div className="card login-card">
         <div className="login-brand">
-          <span className="brand-dot" /> Lead CRM
+          <span className="brand-dot" /> Recruiting Lead CRM
         </div>
+        <p className="login-client">Allied Elite Financial</p>
 
         {done ? (
           <>

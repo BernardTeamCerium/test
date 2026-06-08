@@ -1,0 +1,11 @@
+# Netlify has been retired for this project in favour of Vercel.
+#
+# Netlify decides whether to build by running the `ignore` command: an exit
+# code of 0 cancels the build. `exit 0` therefore skips every Netlify build,
+# so no further Netlify deploys are produced from this repo.
+#
+# To remove Netlify completely, also disconnect/delete the site in the Netlify
+# dashboard (Site configuration → General → Danger zone) and remove the Netlify
+# GitHub App from the repository (GitHub → Settings → Integrations).
+[build]
+  ignore = "exit 0"

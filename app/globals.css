@@ -48,12 +48,34 @@ a {
   align-items: center;
   justify-content: space-between;
 }
+.brand-cluster {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .brand {
   font-weight: 700;
   font-size: 18px;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.brand-divider {
+  width: 1px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.18);
+}
+/* Client co-brand shown next to the product name. */
+.client-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #cbd5e1;
+  letter-spacing: 0.02em;
+}
+.client-logo {
+  height: 24px;
+  width: auto;
+  display: block;
 }
 .brand-dot {
   width: 10px;
@@ -117,6 +139,13 @@ a {
   font-weight: 700;
   font-size: 18px;
   color: var(--text);
+}
+.login-client {
+  margin: 4px 0 0 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
 }
 .login-title {
   font-size: 20px;
